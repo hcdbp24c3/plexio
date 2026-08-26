@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 
 export type PlexToken = string | null;
 
-export interface SetPlexToken {
-  (token: PlexToken): void;
-}
+export type SetPlexToken = (token: PlexToken) => void;
 
 const usePlexToken = (): [PlexToken, SetPlexToken] => {
   const [token, setToken] = useState<PlexToken>(() =>

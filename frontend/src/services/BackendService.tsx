@@ -2,7 +2,7 @@ import axios from 'axios';
 
 export const isServerAliveRemote = async (serverUrl: string, token: string) => {
   try {
-    const response = await axios.get(
+    const response = await axios.get<{ success: boolean }>(
       `${window.location.origin}/api/v1/test-connection`,
       {
         timeout: 25000,

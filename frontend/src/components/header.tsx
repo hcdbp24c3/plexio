@@ -3,6 +3,7 @@ import { Icons } from '@/components/icons.tsx';
 import { ThemeToggle } from '@/components/themeToggle.tsx';
 import { Avatar, AvatarImage } from '@/components/ui/avatar.tsx';
 import { Button } from '@/components/ui/button.tsx';
+import { PlexUser } from '@/types/plex.tsx';
 
 interface Props {
   plexUser: PlexUser | null | undefined;

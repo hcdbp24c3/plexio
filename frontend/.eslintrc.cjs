@@ -19,11 +19,23 @@ module.exports = {
   parser: "@typescript-eslint/parser",
   plugins: ["react-refresh"],
   rules: {
+    "react/prop-types": "off",
     "react-refresh/only-export-components": [
       "warn",
       { allowConstantExport: true },
     ],
   },
+  overrides: [
+    {
+      files: [
+        "src/components/ui/**",
+        "src/components/themeProvider.tsx",
+      ],
+      rules: {
+        "react-refresh/only-export-components": "off",
+      },
+    },
+  ],
   parserOptions: {
     ecmaVersion: "latest",
     sourceType: "module",

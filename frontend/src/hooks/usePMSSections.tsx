@@ -2,8 +2,14 @@ import { useEffect, useState } from 'react';
 import { PlexToken } from '@/hooks/usePlexToken.tsx';
 import { getSections } from '@/services/PMSService.tsx';
 
+interface PlexSection {
+  key: string;
+  title: string;
+  type: string;
+}
+
 const usePMSSections = (serverUrl: string, plexToken: PlexToken) => {
-  const [sections, setSections] = useState<any[]>([]);
+  const [sections, setSections] = useState<PlexSection[]>([]);
 
   useEffect(() => {
     setSections([]);

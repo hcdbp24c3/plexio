@@ -1,5 +1,17 @@
 import axios from 'axios';
 
+interface PlexMediaContainer<T> {
+  MediaContainer?: {
+    Directory?: T[];
+  };
+}
+
+interface PlexSection {
+  key: string;
+  title: string;
+  type: string;
+}
+
 export const isServerAliveLocal = async (serverUrl: string, token: string) => {
   try {
     const response = await axios.get(serverUrl, {
@@ -18,14 +30,17 @@ export const isServerAliveLocal = async (serverUrl: string, token: string) => {
 export const getSections = async (
   serverUrl: string,
   token: string,
-): Promise<any[]> => {
+): Promise<PlexSection[]> => {
   try {
-    const response = await axios.get(`${serverUrl}/library/sections`, {
-      timeout: 25000,
-      params: {
-        'X-Plex-Token': token,
+    const response = await axios.get<PlexMediaContainer<PlexSection>>(
+      `${serverUrl}/library/sections`,
+      {
+        timeout: 25000,
+        params: {
+          'X-Plex-Token': token,
+        },
       },
-    });
+    );
 
     const sections = response.data?.MediaContainer?.Directory;
 
@@ -33,8 +48,8 @@ export const getSections = async (
       throw new Error('Invalid response from server');
     }
 
-    return sections.filter((section: any) =>
-      ['show', 'movie'].includes(section?.type),
+    return sections.filter(
+      (section) => section.type === 'show' || section.type === 'movie',
     );
   } catch (error) {
     console.error('Error fetching Plex servers:', error);

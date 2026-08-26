@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import useClientIdentifier from '@/hooks/useClientIdentifier.tsx';
 import { PlexToken } from '@/hooks/usePlexToken.tsx';
 import { getPlexServers } from '@/services/PlexService.tsx';
+import { PlexServer } from '@/types/plex.tsx';
 
 const usePlexServers = (plexToken: PlexToken | null) => {
   const [servers, setServers] = useState<PlexServer[]>([]);

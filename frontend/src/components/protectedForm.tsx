@@ -3,6 +3,7 @@ import ConfigurationForm from '@/components/configurationForm';
 import Loading from '@/components/loading.tsx';
 import Login from '@/components/login.tsx';
 import usePlexServers from '@/hooks/usePlexServers.tsx';
+import { PlexUser } from '@/types/plex.tsx';
 
 interface Props {
   plexToken: string | null;

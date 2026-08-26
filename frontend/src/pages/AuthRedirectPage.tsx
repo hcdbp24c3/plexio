@@ -29,7 +29,7 @@ const AuthRedirectPage: FC<Props> = ({ setPlexToken }) => {
 
     void setAuthToken();
     navigate(redirect);
-  }, [searchParams, clientIdentifier, navigate]);
+  }, [searchParams, clientIdentifier, navigate, setPlexToken]);
 
   return <Loading />;
 };

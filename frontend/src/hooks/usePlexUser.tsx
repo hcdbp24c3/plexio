@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import useClientIdentifier from '@/hooks/useClientIdentifier.tsx';
 import { PlexToken } from '@/hooks/usePlexToken.tsx';
 import { getPlexUser } from '@/services/PlexService.tsx';
+import { PlexUser } from '@/types/plex.tsx';
 
 const usePlexUser = (plexToken: PlexToken) => {
   const [user, setUser] = useState<undefined | null | PlexUser>();

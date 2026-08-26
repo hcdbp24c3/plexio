@@ -30,7 +30,7 @@ const Login = () => {
         your Plex media directly within Stremio.
       </p>
       <div className="mt-6">
-        <Button onClick={handleLogin} className="w-full">
+        <Button onClick={() => void handleLogin()} className="w-full">
           Login
         </Button>
       </div>
