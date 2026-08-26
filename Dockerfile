@@ -23,3 +23,6 @@ RUN pip install -e . --no-cache-dir
 COPY --from=build /app/dist frontend
 
 COPY unit-nginx-config.json /docker-entrypoint.d/config.json
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:80/health', timeout=4)" || exit 1

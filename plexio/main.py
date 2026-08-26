@@ -52,3 +52,8 @@ app.add_middleware(
 
 app.include_router(addon_router)
 app.include_router(configuration_router)
+
+
+@app.get('/health')
+async def health():
+    return {'status': 'ok'}
