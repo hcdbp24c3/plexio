@@ -1,9 +1,13 @@
 import asyncio
+import logging
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from enum import Enum
 
 from redis.asyncio import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
+
+logger = logging.getLogger(__name__)
 
 PLEX_CACHE_TTL = 24 * 60 * 60
 
@@ -36,14 +40,25 @@ class AbstractCache(ABC):
 
 
 class MemoryCache(AbstractCache):
-    def __init__(self):
-        self._cache = {}
+    def __init__(self, maxsize: int = 1024):
+        if maxsize < 1:
+            raise ValueError('maxsize must be >= 1')
+        self._maxsize = maxsize
+        self._cache: OrderedDict = OrderedDict()
 
     async def set(self, key, value):
+        if key in self._cache:
+            del self._cache[key]
         self._cache[key] = value
+        self._cache.move_to_end(key)
+        while len(self._cache) > self._maxsize:
+            self._cache.popitem(last=False)
 
     async def get(self, key):
-        return self._cache.get(key)
+        if key in self._cache:
+            self._cache.move_to_end(key)
+            return self._cache[key]
+        return None
 
     async def close(self):
         pass
@@ -60,8 +75,14 @@ class RedisCache(AbstractCache):
         for _ in range(RedisCache.RETRY_TIMES):
             try:
                 await self._redis.set(key, value, ex=PLEX_CACHE_TTL)
+                return
             except RedisConnectionError:
                 await asyncio.sleep(RedisCache.RETRY_BACKOFF_SEC)
+        logger.exception(
+            'Failed to set key %r after %d attempts',
+            key,
+            RedisCache.RETRY_TIMES,
+        )
 
     async def get(self, key):
         for _ in range(RedisCache.RETRY_TIMES):
@@ -71,6 +92,12 @@ class RedisCache(AbstractCache):
                 return None
             except RedisConnectionError:
                 await asyncio.sleep(RedisCache.RETRY_BACKOFF_SEC)
+        logger.error(
+            'Failed to get key %r after %d attempts',
+            key,
+            RedisCache.RETRY_TIMES,
+        )
+        return None
 
     async def close(self):
         await self._redis.close()
