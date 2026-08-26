@@ -4,13 +4,12 @@ import { encode as base64_encode } from 'js-base64';
 import { useForm } from 'react-hook-form';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  DiscoveryUrlField,
+  IncludeCatalogsField,
   IncludeTranscodeOriginalField,
-  SectionsField,
-  ServerNameField,
-  StreamingUrlField,
   IncludeTranscodeDownFields,
   IncludePlexTvField,
+  ServerCheckboxListField,
+  PerServerConfig,
 } from '@/components/configurationForm/fields';
 import {
   formSchema,
@@ -19,7 +18,7 @@ import {
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button.tsx';
 import { Form } from '@/components/ui/form';
-import usePMSSections from '@/hooks/usePMSSections.tsx';
+import { PlexServer } from '@/types/plex.tsx';
 
 interface Props {
   servers: PlexServer[];
@@ -29,31 +28,81 @@ const ConfigurationForm: FC<Props> = ({ servers }) => {
   const form = useForm<ConfigurationFormType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      selectedServers: [],
+      serverConfigs: [],
+      includeCatalogs: true,
       includeTranscodeOriginal: false,
       includeTranscodeDown: false,
       includePlexTv: false,
-      sections: [],
     },
   });
 
-  const serverName = form.watch('serverName');
-  const server = servers.find((s) => s.name == serverName);
+  const selectedServerNames = form.watch('selectedServers');
+  // Render in serverConfigs order — group index must match its form-field index.
+  const serverConfigs = form.watch('serverConfigs');
 
-  const discoveryUrl = form.watch('discoveryUrl');
-  const sections = usePMSSections(discoveryUrl, server?.accessToken || null);
+  const handleSelectionChange = (selectedNames: string[]) => {
+    const currentConfigs = form.getValues('serverConfigs');
 
-  function onSubmit(configuration: any, event: any) {
-    configuration.version = __APP_VERSION__;
-    configuration.accessToken = server?.accessToken;
-    configuration.sections = configuration.sections.filter((item: any) =>
-      sections.find((s) => s.key === item.key),
-    );
+    // Find configs to keep (servers still selected)
+    const configsToKeep = selectedNames
+      .map((name) => {
+        const existing = currentConfigs.find((c) => c.serverName === name);
+        if (existing) return existing;
+        // New server selected — add default config
+        return {
+          serverName: name,
+          discoveryUrl: '',
+          streamingUrl: '',
+          sections: [],
+        };
+      })
+      .filter(Boolean);
 
-    const encodedConfiguration = base64_encode(JSON.stringify(configuration));
+    form.setValue('serverConfigs', configsToKeep);
+  };
+
+  function onSubmit(
+    configuration: ConfigurationFormType,
+    event?: React.BaseSyntheticEvent,
+  ) {
+    const payload = {
+      servers: configuration.serverConfigs
+        .filter((config) =>
+          configuration.selectedServers.includes(config.serverName),
+        )
+        .map((config) => {
+          const plexServer = servers.find(
+            (s) => s.name === config.serverName,
+          );
+          return {
+            accessToken: plexServer?.accessToken ?? '',
+            discoveryUrl: config.discoveryUrl,
+            streamingUrl: config.streamingUrl,
+            serverName: config.serverName,
+            sections: config.sections.map((s) => ({
+              key: s.key,
+              title: s.title,
+              type: s.type,
+            })),
+          };
+        }),
+      includeCatalogs: configuration.includeCatalogs,
+      includeTranscodeOriginal: configuration.includeTranscodeOriginal,
+      includeTranscodeDown: configuration.includeTranscodeDown,
+      transcodeDownQualities: configuration.transcodeDownQualities ?? [],
+      includePlexTv: configuration.includePlexTv,
+      version: __APP_VERSION__,
+    };
+
+    const encodedConfiguration = base64_encode(JSON.stringify(payload));
     const addonUrl = `${window.location.origin}/${uuidv4()}/${encodedConfiguration}/manifest.json`;
 
-    if (event.nativeEvent.submitter.name === 'clipboard') {
-      navigator.clipboard.writeText(addonUrl);
+    const submitter = (event?.nativeEvent as SubmitEvent)?.submitter as
+      | HTMLButtonElement
+      | undefined;
+    if (submitter?.name === 'clipboard') {
+      void navigator.clipboard.writeText(addonUrl);
     } else {
       window.location.href = addonUrl.replace(/https?:\/\//, 'stremio://');
     }
@@ -62,31 +111,48 @@ const ConfigurationForm: FC<Props> = ({ servers }) => {
   return (
     <Form {...form}>
       <form
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={form.handleSubmit(onSubmit)}
         className="space-y-2 p-2 rounded-lg border"
       >
-        <ServerNameField form={form} servers={servers} />
-        {server && (
-          <>
-            <DiscoveryUrlField form={form} server={server} />
-            <StreamingUrlField form={form} server={server} />
-          </>
-        )}
-        {discoveryUrl && (
-          <SectionsField form={form} sections={sections}></SectionsField>
-        )}
+        <ServerCheckboxListField
+          form={form}
+          servers={servers}
+          onSelectionChange={handleSelectionChange}
+        />
+
+        {serverConfigs.map((config, index) => {
+          const server = servers.find((s) => s.name === config.serverName);
+          if (!server) return null;
+          return (
+            <PerServerConfig
+              key={server.name}
+              form={form}
+              server={server}
+              index={index}
+            />
+          );
+        })}
+
+        <IncludeCatalogsField form={form} />
         <IncludeTranscodeOriginalField form={form} />
         <IncludeTranscodeDownFields form={form} />
         <IncludePlexTvField form={form} />
 
         <div className="flex items-center space-x-1 justify-center p-3">
-          <Button className="h-11 w-10 p-2" type="submit" name="clipboard">
+          <Button
+            className="h-11 w-10 p-2"
+            type="submit"
+            name="clipboard"
+            disabled={selectedServerNames.length === 0}
+          >
             <Icons.clipboard />
           </Button>
           <Button
             className="h-11 rounded-md px-8 text-xl"
             type="submit"
             name="install"
+            disabled={selectedServerNames.length === 0}
           >
             Install
           </Button>

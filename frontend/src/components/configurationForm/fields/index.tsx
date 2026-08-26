@@ -1,7 +1,6 @@
-export { ServerNameField } from './serverName.tsx';
-export { DiscoveryUrlField } from './discoveryUrl.tsx';
-export { StreamingUrlField } from './streamingUrl.tsx';
-export { SectionsField } from './sections.tsx';
+export { ServerCheckboxListField } from './serverCheckboxList.tsx';
+export { PerServerConfig } from './perServerConfig.tsx';
+export { IncludeCatalogsField } from './includeCatalogsField.tsx';
 export { IncludeTranscodeOriginalField } from './includeTranscodeOriginal.tsx';
 export { IncludeTranscodeDownFields } from './includeTranscodeDown.tsx';
 export { IncludePlexTvField } from './includePlexTv.tsx';
