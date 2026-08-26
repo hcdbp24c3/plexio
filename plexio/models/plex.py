@@ -4,7 +4,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from plexio.models.utils import get_flag_emoji, guid_to_plexio_id, to_camel
+from plexio.models.utils import get_flag_emoji, to_camel
 
 
 class Resolution(str, Enum):
@@ -100,37 +100,39 @@ class PlexMediaMeta(BaseModel):
             return str(self.year)
         return datetime.fromtimestamp(self.added_at).strftime('%Y')
 
-    def to_stremio_meta(self, configuration):
+    def to_stremio_meta(self, server, server_index=None):
         from plexio.models import PLEX_TO_STREMIO_MEDIA_TYPE
         from plexio.models.stremio import StremioMeta
+        from plexio.models.utils import guid_to_plexio_id
 
         return StremioMeta(
-            id=guid_to_plexio_id(self.guid),
+            id=guid_to_plexio_id(self.guid, server_index=server_index),
             type=PLEX_TO_STREMIO_MEDIA_TYPE[self.type],
             name=self.title,
             releaseInfo=self.get_year(),
             imdbRating=self.audience_rating,
             description=self.summary,
             poster=str(
-                configuration.streaming_url
+                server.streaming_url
                 / self.thumb[1:]
-                % {'X-Plex-Token': configuration.access_token},
+                % {'X-Plex-Token': server.access_token},
             )
             if self.thumb
             else None,
             background=str(
-                configuration.streaming_url
+                server.streaming_url
                 / (self.art or self.thumb)[1:]
-                % {'X-Plex-Token': configuration.access_token},
+                % {'X-Plex-Token': server.access_token},
             )
             if (self.art or self.thumb)
             else None,
             genres=[g['tag'] for g in self.genre],
         )
 
-    def to_stremio_meta_review(self, configuration):
+    def to_stremio_meta_review(self, server, server_index=None):
         from plexio.models import PLEX_TO_STREMIO_MEDIA_TYPE
         from plexio.models.stremio import StremioMetaPreview
+        from plexio.models.utils import guid_to_plexio_id
 
         stremio_id = None
         guids = self.guids
@@ -140,7 +142,7 @@ class PlexMediaMeta(BaseModel):
 
         if not stremio_id:
             if '://' in self.guid:
-                stremio_id = guid_to_plexio_id(self.guid)
+                stremio_id = guid_to_plexio_id(self.guid, server_index=server_index)
             else:
                 stremio_id = self.guid
 
@@ -149,9 +151,9 @@ class PlexMediaMeta(BaseModel):
             name=self.title,
             releaseInfo=str(self.year),
             poster=str(
-                configuration.streaming_url
+                server.streaming_url
                 / self.thumb[1:]
-                % {'X-Plex-Token': configuration.access_token},
+                % {'X-Plex-Token': server.access_token},
             )
             if self.thumb
             else None,
@@ -161,12 +163,12 @@ class PlexMediaMeta(BaseModel):
             genres=[g['tag'] for g in self.genre],
         )
 
-    def get_stremio_streams(self, configuration):
+    def get_stremio_streams(self, server, configuration):  # noqa: C901
         from plexio.models.stremio import StremioStream
 
         streams = []
         for i, media in enumerate(self.media):
-            name = f'{configuration.server_name} {self.library_section_title}'
+            name = f'{server.server_name} {self.library_section_title}'
             filename = os.path.basename(media['Part'][0]['file'])
 
             audio_languages = set()
@@ -187,10 +189,10 @@ class PlexMediaMeta(BaseModel):
                                 'id': str(part_stream['id']),
                                 'lang': part_stream['displayTitle'],
                                 'url': str(
-                                    configuration.streaming_url
+                                    server.streaming_url
                                     / part_stream['key'][1:]
                                     % {
-                                        'X-Plex-Token': configuration.access_token,
+                                        'X-Plex-Token': server.access_token,
                                     }
                                 ),
                             }
@@ -211,10 +213,10 @@ class PlexMediaMeta(BaseModel):
                         languages=languages,
                     ),
                     url=str(
-                        configuration.streaming_url
+                        server.streaming_url
                         / media['Part'][0]['key'][1:]
                         % {
-                            'X-Plex-Token': configuration.access_token,
+                            'X-Plex-Token': server.access_token,
                         },
                     ),
                     subtitles=external_subtitles,
@@ -223,7 +225,7 @@ class PlexMediaMeta(BaseModel):
             )
 
             transcode_url = (
-                configuration.streaming_url
+                server.streaming_url
                 / 'video/:/transcode/universal/start.m3u8'
                 % {
                     'path': self.key,
@@ -233,7 +235,7 @@ class PlexMediaMeta(BaseModel):
                     'copyts': 1,
                     'autoAdjustQuality': 0,
                     'X-Plex-Platform': 'Chrome',
-                    'X-Plex-Token': configuration.access_token,
+                    'X-Plex-Token': server.access_token,
                 }
             )
             if configuration.include_transcode_original:
@@ -319,8 +321,9 @@ class PlexEpisodeMeta(BaseModel):
     updated_at: int | None = None
     media: list = Field(default_factory=list)
 
-    def to_stremio_video_meta(self, configuration):
+    def to_stremio_video_meta(self, configuration, server_index=None):
         from plexio.models.stremio import StremioVideoMeta
+        from plexio.models.utils import guid_to_plexio_id
 
         if self.originally_available_at:
             released = f'{self.originally_available_at}T00:00:00.000Z'
@@ -330,7 +333,7 @@ class PlexEpisodeMeta(BaseModel):
             )
 
         return StremioVideoMeta(
-            id=guid_to_plexio_id(self.guid),
+            id=guid_to_plexio_id(self.guid, server_index=server_index),
             title=self.title,
             released=released,
             thumbnail=str(

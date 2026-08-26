@@ -129,13 +129,32 @@ def to_camel(string: str) -> str:
     return words[0].lower() + ''.join(word.capitalize() for word in words[1:])
 
 
-def guid_to_plexio_id(guid: str) -> str:
+def guid_to_plexio_id(guid: str, server_index: int | None = None) -> str:
     encoded_guid = base64.urlsafe_b64encode(guid.encode()).rstrip(b'=').decode()
+    if server_index is not None:
+        return f'{PLEXIO_PREFIX}{server_index}:{encoded_guid}'
     return PLEXIO_PREFIX + encoded_guid
 
 
-def plexio_id_to_guid(plexio_id: str) -> str:
-    encoded_guid = plexio_id[len(PLEXIO_PREFIX):]
+def parse_plexio_id(plexio_id: str) -> tuple[int | None, str]:
+    """Parse a plexio ID into (server_index, guid).
+
+    Supports both legacy format ``plexio:<b64>`` and new marked format
+    ``plexio:<index>:<b64>``.  For legacy IDs the server_index is ``None``.
+    """
+    without_prefix = plexio_id[len(PLEXIO_PREFIX) :]
+    parts = without_prefix.split(':', maxsplit=1)
+    if len(parts) == 2 and parts[0].isdigit():
+        server_index = int(parts[0])
+        encoded_guid = parts[1]
+    else:
+        server_index = None
+        encoded_guid = without_prefix
     padding = 4 - (len(encoded_guid) % 4)
     encoded_guid += '=' * padding
-    return base64.urlsafe_b64decode(encoded_guid).decode()
+    return server_index, base64.urlsafe_b64decode(encoded_guid).decode()
+
+
+def plexio_id_to_guid(plexio_id: str) -> str:
+    _, guid = parse_plexio_id(plexio_id)
+    return guid
