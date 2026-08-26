@@ -19,6 +19,7 @@ export const isServerAliveLocal = async (serverUrl: string, token: string) => {
       params: {
         'X-Plex-Token': token,
       },
+      headers: { Accept: 'application/json' },
     });
     return response.status === 200;
   } catch (error) {
@@ -39,6 +40,7 @@ export const getSections = async (
         params: {
           'X-Plex-Token': token,
         },
+        headers: { Accept: 'application/json' },
       },
     );
 
