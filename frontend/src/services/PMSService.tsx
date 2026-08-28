@@ -1,12 +1,6 @@
 import axios from 'axios';
 
-interface PlexMediaContainer<T> {
-  MediaContainer?: {
-    Directory?: T[];
-  };
-}
-
-interface PlexSection {
+export interface PlexSection {
   key: string;
   title: string;
   type: string;
@@ -33,28 +27,23 @@ export const getSections = async (
   token: string,
 ): Promise<PlexSection[]> => {
   try {
-    const response = await axios.get<PlexMediaContainer<PlexSection>>(
-      `${serverUrl}/library/sections`,
+    // Sections are fetched through the addon backend so browsers are never
+    // blocked by the Plex server's CORS policy (the backend must be able to
+    // reach it anyway for catalogs/streams to work).
+    const response = await axios.get<{ sections: PlexSection[] }>(
+      `${window.location.origin}/api/v1/sections`,
       {
         timeout: 25000,
         params: {
-          'X-Plex-Token': token,
+          url: serverUrl,
+          token: token,
         },
-        headers: { Accept: 'application/json' },
       },
     );
 
-    const sections = response.data?.MediaContainer?.Directory;
-
-    if (!Array.isArray(sections)) {
-      throw new Error('Invalid response from server');
-    }
-
-    return sections.filter(
-      (section) => section.type === 'show' || section.type === 'movie',
-    );
+    return response.data?.sections ?? [];
   } catch (error) {
-    console.error('Error fetching Plex servers:', error);
+    console.error('Error fetching Plex sections:', error);
     throw error;
   }
 };

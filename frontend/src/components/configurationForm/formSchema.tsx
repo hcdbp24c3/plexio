@@ -21,6 +21,7 @@ export const formSchema = z.object({
   transcodeDownQualities: z.array(z.string()).optional(),
   includeCatalogs: z.boolean(),
   includePlexTv: z.boolean(),
+  streamProxy: z.boolean(),
 });
 
 export type ConfigurationFormType = z.infer<typeof formSchema>;

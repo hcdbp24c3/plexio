@@ -74,6 +74,11 @@ class TestLegacyFlatConfig:
         assert cfg.transcode_down_qualities == []
         assert cfg.include_plex_tv is False
         assert cfg.version == '0.0.1'
+        assert cfg.stream_proxy is False
+
+    def test_stream_proxy_roundtrip(self):
+        cfg = AddonConfiguration(**_legacy_dict(streamProxy=True))
+        assert cfg.stream_proxy is True
 
 
 class TestNewMultiServerConfig:

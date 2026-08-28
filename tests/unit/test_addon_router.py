@@ -235,7 +235,9 @@ class _MockMedia:
         self.summary = 'Summary'
         self.guids = []
 
-    def to_stremio_meta(self, server, server_index=None):
+    def to_stremio_meta(
+        self, server, server_index=None, *, stream_proxy=False, proxy_base=None
+    ):
         from plexio.models.stremio import StremioMeta
         from plexio.models.utils import guid_to_plexio_id
 
@@ -321,7 +323,7 @@ class _MockMediaForStream:
     def __init__(self, guid):
         self.guid = guid
 
-    def get_stremio_streams(self, server, configuration):
+    def get_stremio_streams(self, server, configuration, *, proxy_base=None):
         return [
             StremioStream(
                 name=server.server_name,

@@ -3,7 +3,7 @@ from itertools import chain
 from typing import Annotated
 
 from aiohttp import ClientSession
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from redis.asyncio.client import Redis
 
 from plexio import __version__
@@ -31,9 +31,16 @@ from plexio.plex.media_server_api import (
     get_section_media,
     stremio_to_plex_id,
 )
+from plexio.settings import settings
 
 router = APIRouter()
 router.dependencies.append(Depends(set_sentry_user))
+
+
+def _proxy_base(request: Request) -> str | None:
+    if settings.addon_base_url:
+        return settings.addon_base_url.rstrip('/')
+    return str(request.base_url).rstrip('/')
 
 
 async def _gather_media(
@@ -67,12 +74,14 @@ async def _gather_media(
 def _streams_from_pairs(
     pairs: list[tuple[ServerConfiguration, object]],
     configuration: AddonConfiguration,
+    *,
+    proxy_base: str | None = None,
 ) -> list:
     """Build stremio streams from (server, meta) pairs."""
     return [
         s
         for server, meta in pairs
-        for s in meta.get_stremio_streams(server, configuration)
+        for s in meta.get_stremio_streams(server, configuration, proxy_base=proxy_base)
     ]
 
 
@@ -161,6 +170,7 @@ async def get_manifest(
     response_model_exclude_none=True,
 )
 async def get_catalog(
+    request: Request,
     http: Annotated[ClientSession, Depends(get_http_client)],
     configuration: Annotated[AddonConfiguration, Depends(get_addon_configuration)],
     stremio_type: StremioMediaType,
@@ -192,9 +202,16 @@ async def get_catalog(
         skip=extras.get('skip', 0),
         sort=extras.get('sort', 'Title'),
     )
+    proxy_base = _proxy_base(request)
     return StremioCatalog(
         metas=[
-            m.to_stremio_meta_review(server, server_index=server_index) for m in media
+            m.to_stremio_meta_review(
+                server,
+                server_index=server_index,
+                stream_proxy=configuration.stream_proxy,
+                proxy_base=proxy_base,
+            )
+            for m in media
         ],
     )
 
@@ -204,6 +221,7 @@ async def get_catalog(
     response_model_exclude_none=True,
 )
 async def get_meta(
+    request: Request,
     http: Annotated[ClientSession, Depends(get_http_client)],
     configuration: Annotated[AddonConfiguration, Depends(get_addon_configuration)],
     stremio_type: StremioMediaType,
@@ -213,6 +231,8 @@ async def get_meta(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     server_index, guid = parse_plexio_id(plex_id)
+    proxy_base = _proxy_base(request)
+    stream_proxy = configuration.stream_proxy
 
     # Determined server: query only that server
     if server_index is not None and 0 <= server_index < len(configuration.servers):
@@ -225,7 +245,12 @@ async def get_meta(
             get_only_first=True,
         )
         if media:
-            meta = media[0].to_stremio_meta(server, server_index=server_index)
+            meta = media[0].to_stremio_meta(
+                server,
+                server_index=server_index,
+                stream_proxy=stream_proxy,
+                proxy_base=proxy_base,
+            )
             if stremio_type == StremioMediaType.series:
                 episodes = await get_all_episodes(
                     client=http,
@@ -234,7 +259,12 @@ async def get_meta(
                     key=media[0].key,
                 )
                 meta.videos = [
-                    e.to_stremio_video_meta(server, server_index=server_index)
+                    e.to_stremio_video_meta(
+                        server,
+                        server_index=server_index,
+                        stream_proxy=stream_proxy,
+                        proxy_base=proxy_base,
+                    )
                     for e in episodes
                 ]
             return StremioMetaResponse(meta=meta)
@@ -260,7 +290,12 @@ async def get_meta(
         idx, media = result
         if media:
             server = configuration.servers[idx]
-            meta = media[0].to_stremio_meta(server, server_index=idx)
+            meta = media[0].to_stremio_meta(
+                server,
+                server_index=idx,
+                stream_proxy=stream_proxy,
+                proxy_base=proxy_base,
+            )
             if stremio_type == StremioMediaType.series:
                 episodes = await get_all_episodes(
                     client=http,
@@ -269,7 +304,13 @@ async def get_meta(
                     key=media[0].key,
                 )
                 meta.videos = [
-                    e.to_stremio_video_meta(server, server_index=idx) for e in episodes
+                    e.to_stremio_video_meta(
+                        server,
+                        server_index=idx,
+                        stream_proxy=stream_proxy,
+                        proxy_base=proxy_base,
+                    )
+                    for e in episodes
                 ]
             return StremioMetaResponse(meta=meta)
 
@@ -313,6 +354,7 @@ async def _resolve_tt_to_plex_id(
     response_model_exclude_none=True,
 )
 async def get_stream(
+    request: Request,
     http: Annotated[ClientSession, Depends(get_http_client)],
     cache: Annotated[Redis, Depends(get_cache)],
     configuration: Annotated[AddonConfiguration, Depends(get_addon_configuration)],
@@ -320,6 +362,7 @@ async def get_stream(
     media_id: str,
 ) -> StremioStreamsResponse:
     servers = configuration.servers
+    proxy_base = _proxy_base(request)
 
     if media_id.startswith('tt'):
         plex_id = await _resolve_tt_to_plex_id(
@@ -333,7 +376,7 @@ async def get_stream(
             return StremioStreamsResponse()
 
         pairs = await _gather_media(http, servers, plex_id)
-        streams = _streams_from_pairs(pairs, configuration)
+        streams = _streams_from_pairs(pairs, configuration, proxy_base=proxy_base)
         return StremioStreamsResponse(streams=streams)
 
     if media_id.startswith('plexio:'):
@@ -349,16 +392,19 @@ async def get_stream(
             )
             return StremioStreamsResponse(
                 streams=chain.from_iterable(
-                    meta.get_stremio_streams(server, configuration) for meta in media
+                    meta.get_stremio_streams(
+                        server, configuration, proxy_base=proxy_base
+                    )
+                    for meta in media
                 ),
             )
 
         # Fallback: probe all servers in parallel
         pairs = await _gather_media(http, servers, guid)
-        streams = _streams_from_pairs(pairs, configuration)
+        streams = _streams_from_pairs(pairs, configuration, proxy_base=proxy_base)
         return StremioStreamsResponse(streams=streams)
 
     # Raw ID: get_media on every server, merged in parallel
     pairs = await _gather_media(http, servers, media_id)
-    streams = _streams_from_pairs(pairs, configuration)
+    streams = _streams_from_pairs(pairs, configuration, proxy_base=proxy_base)
     return StremioStreamsResponse(streams=streams)

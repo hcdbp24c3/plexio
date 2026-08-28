@@ -5,6 +5,14 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from plexio.models.utils import get_flag_emoji, to_camel
+from plexio.security import mint_proxy_token
+
+
+def _maybe_proxy(url: str, *, stream_proxy: bool, proxy_base: str | None) -> str:
+    """Wrap ``url`` in an opaque relay token when stream proxying is enabled."""
+    if stream_proxy and proxy_base:
+        return f'{proxy_base.rstrip("/")}/proxy/{mint_proxy_token(url)}'
+    return url
 
 
 class Resolution(str, Enum):
@@ -100,11 +108,38 @@ class PlexMediaMeta(BaseModel):
             return str(self.year)
         return datetime.fromtimestamp(self.added_at).strftime('%Y')
 
-    def to_stremio_meta(self, server, server_index=None):
+    def _proxy_url(
+        self, server, key: str, *, stream_proxy: bool, proxy_base: str | None
+    ) -> str:
+        url = str(
+            server.streaming_url / key[1:] % {'X-Plex-Token': server.access_token}
+        )
+        return _maybe_proxy(url, stream_proxy=stream_proxy, proxy_base=proxy_base)
+
+    def to_stremio_meta(
+        self, server, server_index=None, *, stream_proxy=False, proxy_base=None
+    ):
         from plexio.models import PLEX_TO_STREMIO_MEDIA_TYPE
         from plexio.models.stremio import StremioMeta
         from plexio.models.utils import guid_to_plexio_id
 
+        poster = (
+            self._proxy_url(
+                server, self.thumb, stream_proxy=stream_proxy, proxy_base=proxy_base
+            )
+            if self.thumb
+            else None
+        )
+        background = (
+            self._proxy_url(
+                server,
+                self.art or self.thumb,
+                stream_proxy=stream_proxy,
+                proxy_base=proxy_base,
+            )
+            if (self.art or self.thumb)
+            else None
+        )
         return StremioMeta(
             id=guid_to_plexio_id(self.guid, server_index=server_index),
             type=PLEX_TO_STREMIO_MEDIA_TYPE[self.type],
@@ -112,24 +147,14 @@ class PlexMediaMeta(BaseModel):
             releaseInfo=self.get_year(),
             imdbRating=self.audience_rating,
             description=self.summary,
-            poster=str(
-                server.streaming_url
-                / self.thumb[1:]
-                % {'X-Plex-Token': server.access_token},
-            )
-            if self.thumb
-            else None,
-            background=str(
-                server.streaming_url
-                / (self.art or self.thumb)[1:]
-                % {'X-Plex-Token': server.access_token},
-            )
-            if (self.art or self.thumb)
-            else None,
+            poster=poster,
+            background=background,
             genres=[g['tag'] for g in self.genre],
         )
 
-    def to_stremio_meta_review(self, server, server_index=None):
+    def to_stremio_meta_review(
+        self, server, server_index=None, *, stream_proxy=False, proxy_base=None
+    ):
         from plexio.models import PLEX_TO_STREMIO_MEDIA_TYPE
         from plexio.models.stremio import StremioMetaPreview
         from plexio.models.utils import guid_to_plexio_id
@@ -150,22 +175,29 @@ class PlexMediaMeta(BaseModel):
             id=stremio_id,
             name=self.title,
             releaseInfo=str(self.year),
-            poster=str(
-                server.streaming_url
-                / self.thumb[1:]
-                % {'X-Plex-Token': server.access_token},
-            )
-            if self.thumb
-            else None,
+            poster=(
+                self._proxy_url(
+                    server, self.thumb, stream_proxy=stream_proxy, proxy_base=proxy_base
+                )
+                if self.thumb
+                else None
+            ),
             type=PLEX_TO_STREMIO_MEDIA_TYPE[self.type],
             imdbRating=self.audience_rating,
             description=self.summary,
             genres=[g['tag'] for g in self.genre],
         )
 
-    def get_stremio_streams(self, server, configuration):  # noqa: C901
+    def get_stremio_streams(  # noqa: C901
+        self,
+        server,
+        configuration,
+        *,
+        proxy_base=None,
+    ):
         from plexio.models.stremio import StremioStream
 
+        stream_proxy = configuration.stream_proxy
         streams = []
         for i, media in enumerate(self.media):
             name = f'{server.server_name} {self.library_section_title}'
@@ -188,12 +220,16 @@ class PlexMediaMeta(BaseModel):
                             {
                                 'id': str(part_stream['id']),
                                 'lang': part_stream['displayTitle'],
-                                'url': str(
-                                    server.streaming_url
-                                    / part_stream['key'][1:]
-                                    % {
-                                        'X-Plex-Token': server.access_token,
-                                    }
+                                'url': _maybe_proxy(
+                                    str(
+                                        server.streaming_url
+                                        / part_stream['key'][1:]
+                                        % {
+                                            'X-Plex-Token': server.access_token,
+                                        }
+                                    ),
+                                    stream_proxy=stream_proxy,
+                                    proxy_base=proxy_base,
                                 ),
                             }
                         )
@@ -203,6 +239,11 @@ class PlexMediaMeta(BaseModel):
             if subtitles_languages:
                 languages += f' ({"/".join(sorted(subtitles_languages))})'
 
+            direct_url = str(
+                server.streaming_url
+                / media['Part'][0]['key'][1:]
+                % {'X-Plex-Token': server.access_token},
+            )
             quality_description = f'Direct Play {media.get("videoResolution", "")}'
             streams.append(
                 StremioStream(
@@ -212,12 +253,10 @@ class PlexMediaMeta(BaseModel):
                         quality=quality_description,
                         languages=languages,
                     ),
-                    url=str(
-                        server.streaming_url
-                        / media['Part'][0]['key'][1:]
-                        % {
-                            'X-Plex-Token': server.access_token,
-                        },
+                    url=_maybe_proxy(
+                        direct_url,
+                        stream_proxy=stream_proxy,
+                        proxy_base=proxy_base,
                     ),
                     subtitles=external_subtitles,
                     behaviorHints={'bingeGroup': quality_description},
@@ -250,7 +289,11 @@ class PlexMediaMeta(BaseModel):
                             quality=quality_description,
                             languages=languages,
                         ),
-                        url=str(transcode_url % {'videoQuality': 100}),
+                        url=_maybe_proxy(
+                            str(transcode_url % {'videoQuality': 100}),
+                            stream_proxy=stream_proxy,
+                            proxy_base=proxy_base,
+                        ),
                         subtitles=external_subtitles,
                         behaviorHints={'bingeGroup': quality_description},
                     ),
@@ -270,7 +313,11 @@ class PlexMediaMeta(BaseModel):
                                 quality=quality_description,
                                 languages=languages,
                             ),
-                            url=str(transcode_url % quality_params['plex_args']),
+                            url=_maybe_proxy(
+                                str(transcode_url % quality_params['plex_args']),
+                                stream_proxy=stream_proxy,
+                                proxy_base=proxy_base,
+                            ),
                             subtitles=external_subtitles,
                             behaviorHints={'bingeGroup': quality_description},
                         ),
@@ -321,7 +368,14 @@ class PlexEpisodeMeta(BaseModel):
     updated_at: int | None = None
     media: list = Field(default_factory=list)
 
-    def to_stremio_video_meta(self, configuration, server_index=None):
+    def to_stremio_video_meta(
+        self,
+        configuration,
+        server_index=None,
+        *,
+        stream_proxy=False,
+        proxy_base=None,
+    ):
         from plexio.models.stremio import StremioVideoMeta
         from plexio.models.utils import guid_to_plexio_id
 
@@ -336,13 +390,19 @@ class PlexEpisodeMeta(BaseModel):
             id=guid_to_plexio_id(self.guid, server_index=server_index),
             title=self.title,
             released=released,
-            thumbnail=str(
-                configuration.streaming_url
-                / self.thumb[1:]
-                % {'X-Plex-Token': configuration.access_token},
-            )
-            if self.thumb
-            else None,
+            thumbnail=(
+                _maybe_proxy(
+                    str(
+                        configuration.streaming_url
+                        / self.thumb[1:]
+                        % {'X-Plex-Token': configuration.access_token},
+                    ),
+                    stream_proxy=stream_proxy,
+                    proxy_base=proxy_base,
+                )
+                if self.thumb
+                else None
+            ),
             episode=self.index,
             season=self.parent_index,
             overview=self.summary,

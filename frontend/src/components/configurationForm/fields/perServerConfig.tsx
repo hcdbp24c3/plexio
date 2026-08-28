@@ -39,7 +39,10 @@ export const PerServerConfig: FC<Props> = ({ form, server, index }) => {
   const discoveryUrl = form.watch(
     `${prefix}.discoveryUrl` as never,
   ) as unknown as string;
-  const sections = usePMSSections(discoveryUrl, server.accessToken);
+  const { sections, loading, error } = usePMSSections(
+    discoveryUrl,
+    server.accessToken,
+  );
 
   const [testDiscoveryInProgress, setTestDiscoveryInProgress] =
     useState(false);
@@ -242,55 +245,13 @@ export const PerServerConfig: FC<Props> = ({ form, server, index }) => {
                 Select the Plex library sections to access in Stremio.
               </FormDescription>
             </div>
-            {sections.length > 0 ? (
-              sections.map((item: { key: string; title: string; type: string }) => (
-                <FormField
-                  key={item.key}
-                  control={form.control}
-                  name={`${prefix}.sections` as never}
-                  render={({ field }) => {
-                    const fieldValue = (field.value ?? []) as {
-                      key: string;
-                      title: string;
-                      type: string;
-                    }[];
-                    return (
-                      <FormItem
-                        key={item.key}
-                        className="flex flex-row items-start space-x-3 space-y-0"
-                      >
-                        <FormControl>
-                          <Checkbox
-                            checked={fieldValue.some(
-                              (v) => v.key === item.key,
-                            )}
-                            onCheckedChange={(checked) => {
-                              return checked
-                                ? field.onChange([
-                                    ...fieldValue,
-                                    {
-                                      key: item.key,
-                                      title: item.title,
-                                      type: item.type,
-                                    },
-                                  ])
-                                : field.onChange(
-                                    fieldValue.filter(
-                                      (value) => value.key !== item.key,
-                                    ),
-                                  );
-                            }}
-                          />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {item.title}
-                        </FormLabel>
-                      </FormItem>
-                    );
-                  }}
-                />
-              ))
-            ) : (
+            {error ? (
+              <div className="flex flex-col items-center justify-center py-4">
+                <span className="text-sm text-destructive text-center">
+                  {error}
+                </span>
+              </div>
+            ) : loading ? (
               <div className="flex flex-col items-center justify-center">
                 <div className="w-16 h-16 rounded-full animate-spin border-t-4 border-muted-foreground" />
                 <span className="mt-4 text-lg text-muted-foreground text-center">
@@ -299,6 +260,63 @@ export const PerServerConfig: FC<Props> = ({ form, server, index }) => {
                   <br />
                   If this takes too long, try selecting a different discovery
                   URL.
+                </span>
+              </div>
+            ) : sections.length > 0 ? (
+              sections.map(
+                (item: { key: string; title: string; type: string }) => (
+                  <FormField
+                    key={item.key}
+                    control={form.control}
+                    name={`${prefix}.sections` as never}
+                    render={({ field }) => {
+                      const fieldValue = (field.value ?? []) as {
+                        key: string;
+                        title: string;
+                        type: string;
+                      }[];
+                      return (
+                        <FormItem
+                          key={item.key}
+                          className="flex flex-row items-start space-x-3 space-y-0"
+                        >
+                          <FormControl>
+                            <Checkbox
+                              checked={fieldValue.some(
+                                (v) => v.key === item.key,
+                              )}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([
+                                      ...fieldValue,
+                                      {
+                                        key: item.key,
+                                        title: item.title,
+                                        type: item.type,
+                                      },
+                                    ])
+                                  : field.onChange(
+                                      fieldValue.filter(
+                                        (value) => value.key !== item.key,
+                                      ),
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {item.title}
+                          </FormLabel>
+                        </FormItem>
+                      );
+                    }}
+                  />
+                ),
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center py-4">
+                <span className="text-sm text-muted-foreground text-center">
+                  No movie or TV library sections found on this server. Select
+                  a discovery URL above to load them.
                 </span>
               </div>
             )}

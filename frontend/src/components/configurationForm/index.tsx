@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { encode as base64_encode } from 'js-base64';
+import { encodeURL as base64_url_encode } from 'js-base64';
 import { useForm } from 'react-hook-form';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -10,6 +10,8 @@ import {
   IncludePlexTvField,
   ServerCheckboxListField,
   PerServerConfig,
+  StreamProxyField,
+  EditAddonUrlField,
 } from '@/components/configurationForm/fields';
 import {
   formSchema,
@@ -34,6 +36,7 @@ const ConfigurationForm: FC<Props> = ({ servers }) => {
       includeTranscodeOriginal: false,
       includeTranscodeDown: false,
       includePlexTv: false,
+      streamProxy: false,
     },
   });
 
@@ -92,10 +95,11 @@ const ConfigurationForm: FC<Props> = ({ servers }) => {
       includeTranscodeDown: configuration.includeTranscodeDown,
       transcodeDownQualities: configuration.transcodeDownQualities ?? [],
       includePlexTv: configuration.includePlexTv,
+      streamProxy: configuration.streamProxy,
       version: __APP_VERSION__,
     };
 
-    const encodedConfiguration = base64_encode(JSON.stringify(payload));
+    const encodedConfiguration = base64_url_encode(JSON.stringify(payload));
     const addonUrl = `${window.location.origin}/${uuidv4()}/${encodedConfiguration}/manifest.json`;
 
     const submitter = (event?.nativeEvent as SubmitEvent)?.submitter as
@@ -115,6 +119,8 @@ const ConfigurationForm: FC<Props> = ({ servers }) => {
         onSubmit={form.handleSubmit(onSubmit)}
         className="space-y-2 p-2 rounded-lg border"
       >
+        <EditAddonUrlField form={form} />
+
         <ServerCheckboxListField
           form={form}
           servers={servers}
@@ -138,6 +144,7 @@ const ConfigurationForm: FC<Props> = ({ servers }) => {
         <IncludeTranscodeOriginalField form={form} />
         <IncludeTranscodeDownFields form={form} />
         <IncludePlexTvField form={form} />
+        <StreamProxyField form={form} />
 
         <div className="flex items-center space-x-1 justify-center p-3">
           <Button

@@ -34,6 +34,9 @@ class AddonConfiguration(BaseModel):
     transcode_down_qualities: list[Resolution] = Field(default_factory=list)
     include_plex_tv: bool = False
     include_catalogs: bool = True
+    # Relay media bytes through the addon so clients never see the Plex
+    # origin or the access token in stream/poster URLs.
+    stream_proxy: bool = False
 
     @model_validator(mode='before')
     @classmethod

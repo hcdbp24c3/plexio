@@ -5,6 +5,7 @@ from yarl import URL
 
 from plexio.models.plex import (
     PlexEpisodeMeta,
+    PlexLibrarySection,
     PlexMediaMeta,
     PlexMediaType,
 )
@@ -63,6 +64,33 @@ async def check_server_connection(
             return True
     except (TimeoutError, ClientConnectorError):
         return False
+
+
+async def get_library_sections(
+    *,
+    client: ClientSession,
+    url: URL,
+    token: str,
+) -> list[PlexLibrarySection]:
+    json = await get_json(
+        client=client,
+        url=url / 'library/sections',
+        params={
+            'X-Plex-Token': token,
+        },
+    )
+    sections = []
+    for directory in json['MediaContainer'].get('Directory', []):
+        if directory.get('type') not in ('show', 'movie'):
+            continue
+        sections.append(
+            PlexLibrarySection(
+                key=directory['key'],
+                title=directory['title'],
+                type=directory['type'],
+            ),
+        )
+    return sections
 
 
 async def get_section_media(
