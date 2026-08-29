@@ -2,6 +2,7 @@ import { FC } from 'react';
 import ConfigurationForm from '@/components/configurationForm';
 import Loading from '@/components/loading.tsx';
 import Login from '@/components/login.tsx';
+import { useAddonConfigFromUrl } from '@/hooks/useAddonConfigFromUrl.ts';
 import usePlexServers from '@/hooks/usePlexServers.tsx';
 import { PlexUser } from '@/types/plex.tsx';
 
@@ -23,6 +24,7 @@ const NoServersMessage: FC = () => (
 
 const ProtectedForm: FC<Props> = ({ plexToken, plexUser }) => {
   const { servers, ready } = usePlexServers(plexToken);
+  const initialConfig = useAddonConfigFromUrl();
 
   if (plexUser === null) {
     return <Login />;
@@ -36,7 +38,7 @@ const ProtectedForm: FC<Props> = ({ plexToken, plexUser }) => {
     return <NoServersMessage />;
   }
 
-  return <ConfigurationForm servers={servers} />;
+  return <ConfigurationForm servers={servers} initialConfig={initialConfig} />;
 };
 
 export default ProtectedForm;

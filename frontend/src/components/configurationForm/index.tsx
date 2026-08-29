@@ -24,20 +24,24 @@ import { PlexServer } from '@/types/plex.tsx';
 
 interface Props {
   servers: PlexServer[];
+  /** Parsed config from the install URL, if the page was opened from one. */
+  initialConfig?: ConfigurationFormType | null;
 }
 
-const ConfigurationForm: FC<Props> = ({ servers }) => {
+const defaultFormValues = (): ConfigurationFormType => ({
+  selectedServers: [],
+  serverConfigs: [],
+  includeCatalogs: true,
+  includeTranscodeOriginal: false,
+  includeTranscodeDown: false,
+  includePlexTv: false,
+  streamProxy: false,
+});
+
+const ConfigurationForm: FC<Props> = ({ servers, initialConfig }) => {
   const form = useForm<ConfigurationFormType>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      selectedServers: [],
-      serverConfigs: [],
-      includeCatalogs: true,
-      includeTranscodeOriginal: false,
-      includeTranscodeDown: false,
-      includePlexTv: false,
-      streamProxy: false,
-    },
+    defaultValues: initialConfig ?? defaultFormValues(),
   });
 
   const selectedServerNames = form.watch('selectedServers');
@@ -119,6 +123,13 @@ const ConfigurationForm: FC<Props> = ({ servers }) => {
         onSubmit={form.handleSubmit(onSubmit)}
         className="space-y-2 p-2 rounded-lg border"
       >
+        {initialConfig && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+            Loaded the configuration from this install link. Check the servers
+            below, then install to refresh your addon.
+          </div>
+        )}
+
         <EditAddonUrlField form={form} />
 
         <ServerCheckboxListField
