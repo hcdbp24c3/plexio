@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import usePlexToken from '@/hooks/usePlexToken.tsx';
+import AdminPage from '@/pages/AdminPage.tsx';
 import AuthRedirectPage from '@/pages/AuthRedirectPage.tsx';
 import ProtectedFormPage from '@/pages/ProtectedFormPage.tsx';
 
@@ -13,6 +14,7 @@ function App() {
           path="/auth-redirect"
           element={<AuthRedirectPage setPlexToken={setToken} />}
         ></Route>
+        <Route path="/admin" element={<AdminPage />}></Route>
         <Route
           path="/*"
           element={

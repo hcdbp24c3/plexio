@@ -19,3 +19,58 @@ export const manageLogin = async (password: string): Promise<void> => {
 export const manageLogout = async (): Promise<void> => {
   await axios.post('/api/v1/manage/logout');
 };
+
+export interface ManageSettings {
+  proxyEnabled: boolean;
+  proxyAdminOnly: boolean;
+}
+
+export const saveManageSettings = async (
+  settings: ManageSettings,
+): Promise<ManageSettings> => {
+  const response = await axios.post<ManageSettings>(
+    '/api/v1/manage/settings',
+    settings,
+  );
+  return response.data;
+};
+
+export interface ManageConfigItem {
+  id: string;
+  name: string;
+  serverCount: number;
+  createdAt: number;
+}
+
+export const listManageConfigs = async (): Promise<ManageConfigItem[]> => {
+  const response = await axios.get<ManageConfigItem[]>('/api/v1/manage/configs');
+  return response.data;
+};
+
+export const deleteManageConfig = async (id: string): Promise<void> => {
+  await axios.delete(`/api/v1/manage/configs/${id}`);
+};
+
+export const recordConfig = (config: Record<string, unknown>): void => {
+  // keepalive survives the immediate navigation to the stremio:// install link.
+  void fetch('/api/v1/manage/configs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+    keepalive: true,
+  }).catch(() => undefined);
+};
+
+export const setManagePassword = async (password: string): Promise<void> => {
+  await axios.post('/api/v1/manage/password', { password });
+};
+
+export const changeManagePassword = async (
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> => {
+  await axios.post('/api/v1/manage/password/change', {
+    currentPassword,
+    newPassword,
+  });
+};

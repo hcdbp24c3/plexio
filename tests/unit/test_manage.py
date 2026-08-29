@@ -127,6 +127,106 @@ class TestSetPassword:
         assert resp.status_code == 409
 
 
+class TestAdminApi:
+    def _login(self, client: TestClient, password: str = 'hunter2-secret'):
+        resp = client.post('/api/v1/manage/login', json={'password': password})
+        assert resp.status_code == 204
+
+    def test_settings_require_admin(self):
+        with TestClient(app) as client:
+            client.post('/api/v1/manage/password', json={'password': 'secret-1'})
+            resp = client.post('/api/v1/manage/settings', json={'proxyEnabled': False})
+        assert resp.status_code == 401
+
+    def test_settings_update(self, monkeypatch):
+        monkeypatch.setattr(settings, 'manage_key', 'hunter2-secret')
+        with TestClient(app) as client:
+            self._login(client)
+            resp = client.post(
+                '/api/v1/manage/settings',
+                json={'proxyEnabled': False, 'proxyAdminOnly': False},
+            )
+            assert resp.status_code == 200
+            assert resp.json() == {'proxyEnabled': False, 'proxyAdminOnly': False}
+            body = _status(client)
+            assert body['proxyEnabled'] is False
+            assert body['proxyAdminOnly'] is False
+
+    def test_change_password_requires_admin(self):
+        with TestClient(app) as client:
+            client.post('/api/v1/manage/password', json={'password': 'secret-1'})
+            resp = client.post(
+                '/api/v1/manage/password/change',
+                json={'currentPassword': 'secret-1', 'newPassword': 'long-enough'},
+            )
+        assert resp.status_code == 401
+
+    def test_change_password_flow(self):
+        with TestClient(app) as client:
+            client.post('/api/v1/manage/password', json={'password': 'old-pass'})
+            self._login(client, 'old-pass')
+            wrong = client.post(
+                '/api/v1/manage/password/change',
+                json={'currentPassword': 'nope', 'newPassword': 'new-pass-1'},
+            )
+            assert wrong.status_code == 401
+            ok = client.post(
+                '/api/v1/manage/password/change',
+                json={'currentPassword': 'old-pass', 'newPassword': 'new-pass-1'},
+            )
+            assert ok.status_code == 204
+            # old password no longer works, new one does
+            old = client.post('/api/v1/manage/login', json={'password': 'old-pass'})
+            assert old.status_code == 401
+            fresh = client.post('/api/v1/manage/login', json={'password': 'new-pass-1'})
+            assert fresh.status_code == 204
+
+    def test_change_password_blocked_by_env_key(self, monkeypatch):
+        monkeypatch.setattr(settings, 'manage_key', 'env-key-secret')
+        with TestClient(app) as client:
+            self._login(client, 'env-key-secret')
+            resp = client.post(
+                '/api/v1/manage/password/change',
+                json={'currentPassword': 'env-key-secret', 'newPassword': 'x' * 8},
+            )
+        assert resp.status_code == 409
+
+    def test_configs_crud(self, monkeypatch):
+        monkeypatch.setattr(settings, 'manage_key', 'hunter2-secret')
+        config = {
+            'servers': [
+                {'serverName': 'Alpha', 'accessToken': 't'},
+                {'serverName': 'Beta', 'accessToken': 't'},
+            ],
+            'streamProxy': False,
+        }
+        with TestClient(app) as client:
+            anon = client.get('/api/v1/manage/configs')
+            assert anon.status_code == 401
+            anon_post = client.post('/api/v1/manage/configs', json={'config': config})
+            assert anon_post.status_code == 401
+
+            self._login(client)
+            created = client.post('/api/v1/manage/configs', json={'config': config})
+            assert created.status_code == 200
+            config_id = created.json()['id']
+
+            listing = client.get('/api/v1/manage/configs')
+            assert listing.status_code == 200
+            items = listing.json()
+            assert len(items) == 1
+            assert items[0]['id'] == config_id
+            assert items[0]['name'] == 'Alpha, Beta'
+            assert items[0]['serverCount'] == 2
+            assert 'accessToken' not in str(items[0])
+
+            deleted = client.delete(f'/api/v1/manage/configs/{config_id}')
+            assert deleted.status_code == 204
+            assert client.get('/api/v1/manage/configs').json() == []
+            missing = client.delete(f'/api/v1/manage/configs/{config_id}')
+            assert missing.status_code == 404
+
+
 class TestProxyEnforcement:
     def test_proxy_returns_403_when_disabled(self):
         from plexio.store import get_store

@@ -1,10 +1,10 @@
-"""Admin session for the Configure page.
+"""Admin session for the Configure page and the /admin page.
 
 A server operator can protect the Configure page with a password
 (``MANAGE_KEY`` env var, or a hash stored in the database). Every /api/v1/manage
 endpoint below is open on purpose; the gate it provides is enforced by the
 frontend plus the admin-only checks in the addon/proxy routers. Login is
-rate-limited per IP.
+rate-limited per IP; mutating admin endpoints require a valid session.
 """
 
 import hashlib
@@ -38,6 +38,11 @@ def is_admin(request: Request) -> bool:
         return True
     cookie = request.cookies.get(settings.manage_cookie_name)
     return bool(cookie) and secrets.compare_digest(cookie, key_hash)
+
+
+def require_admin(request: Request) -> None:
+    if not is_admin(request):
+        raise HTTPException(status_code=401, detail='Admin session required')
 
 
 def _clear_session(response: Response) -> None:
@@ -115,3 +120,100 @@ async def set_password(body: SetPasswordBody):
         hashlib.sha256(body.password.encode()).hexdigest(),
     )
     return {'ok': True}
+
+
+class ChangePasswordBody(BaseModel):
+    currentPassword: str
+    newPassword: str
+
+
+@router.post('/password/change')
+async def change_password(request: Request, body: ChangePasswordBody):
+    """Replace the DB-stored manage password (env MANAGE_KEY wins)."""
+    require_admin(request)
+    if settings.manage_key:
+        raise HTTPException(
+            status_code=409,
+            detail='The password is managed by the MANAGE_KEY environment variable',
+        )
+    current = manage_key_hash()
+    if current is None:
+        raise HTTPException(status_code=409, detail='No password is configured')
+    candidate = hashlib.sha256(body.currentPassword.encode()).hexdigest()
+    if not secrets.compare_digest(candidate, current):
+        raise HTTPException(status_code=401, detail='Current password is wrong')
+    if len(body.newPassword) < 8:
+        raise HTTPException(
+            status_code=422, detail='Password must be at least 8 characters'
+        )
+    get_store().set_setting(
+        'manage_key_hash',
+        hashlib.sha256(body.newPassword.encode()).hexdigest(),
+    )
+    response = Response(status_code=204)
+    _set_session(response, manage_key_hash() or '')
+    return response
+
+
+class SettingsBody(BaseModel):
+    proxyEnabled: bool | None = None
+    proxyAdminOnly: bool | None = None
+
+
+@router.post('/settings')
+async def update_settings(request: Request, body: SettingsBody):
+    """Persist server-wide admin toggles."""
+    require_admin(request)
+    store = get_store()
+    if body.proxyEnabled is not None:
+        store.set_setting('proxy_enabled', bool(body.proxyEnabled))
+    if body.proxyAdminOnly is not None:
+        store.set_setting('proxy_admin_only', bool(body.proxyAdminOnly))
+    return {
+        'proxyEnabled': get_proxy_enabled(),
+        'proxyAdminOnly': get_proxy_admin_only(),
+    }
+
+
+def _config_name(config: dict) -> str:
+    servers = config.get('servers') or []
+    names = [s.get('serverName') for s in servers if s.get('serverName')]
+    if not names:
+        return 'Unnamed addon'
+    head = ', '.join(names[:2])
+    return f'{head} +{len(names) - 2}' if len(names) > 2 else head
+
+
+class SaveConfigBody(BaseModel):
+    config: dict
+
+
+@router.post('/configs')
+async def save_config(request: Request, body: SaveConfigBody):
+    """Record an installed addon configuration (admin sessions only)."""
+    require_admin(request)
+    config_id = get_store().save_config(body.config, _config_name(body.config))
+    return {'id': config_id}
+
+
+@router.get('/configs')
+async def list_configs(request: Request):
+    """Privacy-minimized list of recorded installations."""
+    require_admin(request)
+    return [
+        {
+            'id': c['id'],
+            'name': c['name'],
+            'serverCount': len(c['config'].get('servers') or []),
+            'createdAt': c['created_at'],
+        }
+        for c in get_store().list_configs()
+    ]
+
+
+@router.delete('/configs/{config_id}')
+async def delete_config(request: Request, config_id: str):
+    require_admin(request)
+    if not get_store().delete_config(config_id):
+        raise HTTPException(status_code=404, detail='Config not found')
+    return Response(status_code=204)

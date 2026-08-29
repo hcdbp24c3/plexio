@@ -13,7 +13,30 @@ and stream your Plex content directly in Stremio.
 * works with Cinemeta and other IMDB-based addons;
 * handles media without IMDB matching;
 * uses OAuth for safe login without sharing passwords;
+* protects the Configure page with a manage password;
+* server-side admin page with global settings and recorded installations;
 * fully open-source with self-hosting support.
+
+## Admin page
+
+Point your browser to `<addon-origin>/admin` for the server admin page. What
+you can do there (it requires the manage password when one is set):
+
+* **Server settings** — server-wide toggles, persisted in the database and
+  applied to every addon configuration:
+  * *Stream proxy* (`proxy_enabled`): master switch for the media relay. When
+    off, every relay request is refused with `403` regardless of what an addon
+    config requests.
+  * *Admin-only proxy toggle* (`proxy_admin_only`): when on, the proxy toggle
+    in the Configure page is only shown to admin sessions.
+* **Manage password** — set the initial password when none is configured yet,
+  or change the existing one. If the operator set `MANAGE_KEY` in the
+  environment, the API password is managed there and cannot be changed from
+  the page.
+* **Installations** — a privacy-minimized list of addon configurations that
+  were saved by an admin from the Configure page (name, server count, date),
+  with the ability to remove records. No access tokens are ever returned by
+  the list endpoint.
 
 
 ## Self-Hosting
@@ -34,13 +57,14 @@ If you'd prefer to self-host Plexio, you can do so easily using Docker. Follow t
 * *PLEX_MATCHING_TOKEN*: Auth token for Plex media matching (default: `None`).
 * *SENTRY_DSN*: DSN for error tracking with Sentry (default: `None`).
 * *DB_PATH*: SQLite file for server-owned settings — the manage password hash,
-  the proxy-token encryption secret and admin toggles persist here across
-  restarts (`default: :memory:`, i.e. in-process only). In Docker, mount a
-  volume at the default `/app/data` so the database survives container
-  recreation.
-* *MANAGE_KEY*: Password protecting the Configure page. When set, a password
-  screen (admin session cookie) is required before the form loads; it also
-  unlocks the stream-proxy toggle. Leave empty to keep the page open.
+  the proxy-token encryption secret, admin toggles and recorded installations
+  persist here across restarts (`default: :memory:`, i.e. in-process only). In
+  Docker, mount a volume at the default `/app/data` so the database survives
+  container recreation.
+* *MANAGE_KEY*: Password protecting the Configure page and the `/admin` page.
+  When set, a password screen (admin session cookie) is required before they
+  load; it also unlocks the stream-proxy toggle. Leave empty to keep the pages
+  open.
 * *PROXY_ENABLED*: Server-wide master switch for the media relay. When `false`,
   the relay refuses every request regardless of config (default: `true`).
 * *PROXY_ADMIN_ONLY*: When `true`, the stream-proxy toggle is only offered to

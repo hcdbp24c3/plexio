@@ -51,6 +51,33 @@ class TestSqliteStore:
         st.delete_setting('k')
         assert st.get_setting('k') is None
 
+    def test_configs_survive_reopen(self, tmp_path):
+        db = tmp_path / 'plexio.db'
+        st = SqliteStore(str(db))
+        config_id = st.save_config({'servers': [{'serverName': 'A'}]}, 'A')
+        assert st.delete_config('missing-id') is False
+
+        reopened = SqliteStore(str(db))
+        items = reopened.list_configs()
+        assert len(items) == 1
+        assert items[0]['id'] == config_id
+        assert items[0]['name'] == 'A'
+        assert items[0]['config']['servers'][0]['serverName'] == 'A'
+        assert reopened.delete_config(config_id) is True
+        assert reopened.list_configs() == []
+
+
+class TestMemoryStoreConfigs:
+    def test_save_list_delete(self):
+        st = store_module.init_store(':memory:')
+        first = st.save_config({'servers': []}, 'One')
+        second = st.save_config({'servers': []}, 'Two')
+        assert first != second
+        names = {c['name'] for c in st.list_configs()}
+        assert names == {'One', 'Two'}
+        assert st.delete_config(first) is True
+        assert st.delete_config(first) is False
+
 
 class TestStoreHelpers:
     def test_get_or_create_server_secret_persists(self):

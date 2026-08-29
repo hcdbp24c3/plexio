@@ -20,6 +20,7 @@ import {
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button.tsx';
 import { Form } from '@/components/ui/form';
+import { recordConfig } from '@/services/ManageService.tsx';
 import { PlexServer } from '@/types/plex.tsx';
 
 interface Props {
@@ -118,6 +119,10 @@ const ConfigurationForm: FC<Props> = ({
 
     const encodedConfiguration = base64_url_encode(JSON.stringify(payload));
     const addonUrl = `${window.location.origin}/${uuidv4()}/${encodedConfiguration}/manifest.json`;
+
+    if (admin) {
+      recordConfig(payload);
+    }
 
     const submitter = (event?.nativeEvent as SubmitEvent)?.submitter as
       | HTMLButtonElement

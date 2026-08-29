@@ -13,10 +13,18 @@ import logging
 import secrets
 import sqlite3
 import threading
+import time
 
 from plexio.settings import settings
 
 logger = logging.getLogger(__name__)
+
+_ID_ALPHABET = 'abcdefghijkmnopqrstuvwxyz023456789'
+
+
+def random_id(length: int = 12) -> str:
+    """Short, URL-safe id (ambiguous chars omitted), like the reference store."""
+    return ''.join(secrets.choice(_ID_ALPHABET) for _ in range(length))
 
 
 class Store:
@@ -35,10 +43,20 @@ class Store:
     def set_secret(self, value: str) -> None:
         raise NotImplementedError
 
+    def save_config(self, config: dict, name: str) -> str:
+        raise NotImplementedError
+
+    def list_configs(self) -> list[dict]:
+        raise NotImplementedError
+
+    def delete_config(self, config_id: str) -> bool:
+        raise NotImplementedError
+
 
 class MemoryStore(Store):
     def __init__(self):
         self._kv: dict[str, str] = {}
+        self._configs: dict[str, dict] = {}
         self._lock = threading.Lock()
 
     def get_setting(self, key: str):
@@ -62,6 +80,25 @@ class MemoryStore(Store):
         with self._lock:
             self._kv['server_secret'] = value
 
+    def save_config(self, config: dict, name: str) -> str:
+        config_id = random_id()
+        with self._lock:
+            self._configs[config_id] = {
+                'id': config_id,
+                'name': name,
+                'config': config,
+                'created_at': int(time.time()),
+            }
+        return config_id
+
+    def list_configs(self) -> list[dict]:
+        with self._lock:
+            return list(self._configs.values())
+
+    def delete_config(self, config_id: str) -> bool:
+        with self._lock:
+            return self._configs.pop(config_id, None) is not None
+
 
 class SqliteStore(Store):
     def __init__(self, db_path: str):
@@ -75,6 +112,12 @@ class SqliteStore(Store):
             CREATE TABLE IF NOT EXISTS kv (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS configs (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                config_json TEXT NOT NULL,
+                created_at INTEGER NOT NULL
             );
             """
         )
@@ -112,6 +155,41 @@ class SqliteStore(Store):
 
     def set_secret(self, value: str) -> None:
         self._set('server_secret', value)
+
+    def save_config(self, config: dict, name: str) -> str:
+        config_id = random_id()
+        with self._lock:
+            self._conn.execute(
+                'INSERT INTO configs (id, name, config_json, created_at) '
+                'VALUES (?, ?, ?, ?)',
+                (config_id, name, json.dumps(config), int(time.time())),
+            )
+            self._conn.commit()
+        return config_id
+
+    def list_configs(self) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                'SELECT id, name, config_json, created_at FROM configs '
+                'ORDER BY created_at'
+            ).fetchall()
+        return [
+            {
+                'id': row['id'],
+                'name': row['name'],
+                'config': json.loads(row['config_json']),
+                'created_at': row['created_at'],
+            }
+            for row in rows
+        ]
+
+    def delete_config(self, config_id: str) -> bool:
+        with self._lock:
+            cursor = self._conn.execute(
+                'DELETE FROM configs WHERE id = ?', (config_id,)
+            )
+            self._conn.commit()
+        return cursor.rowcount > 0
 
     def close(self) -> None:
         with self._lock:

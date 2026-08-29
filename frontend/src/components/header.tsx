@@ -32,6 +32,9 @@ const Header: FC<Props> = ({ plexUser, setPlexToken }) => {
           <Icons.mail className="h-5 w-5" />
         </a>
       </Button>
+      <Button variant="ghost" size="sm">
+        <a href="/admin">Admin</a>
+      </Button>
       <div className="flex flex-1 items-center justify-end">
         {plexUser && (
           <>
