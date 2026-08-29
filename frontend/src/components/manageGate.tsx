@@ -5,18 +5,29 @@ import { manageLogin } from '@/services/ManageService.tsx';
 
 interface Props {
   onAuthed: () => void;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+  /** Unlock action; defaults to the admin (manage) login. */
+  submit?: (password: string) => Promise<void>;
 }
 
-const ManageGate: FC<Props> = ({ onAuthed }) => {
+const ManageGate: FC<Props> = ({
+  onAuthed,
+  title = 'This Configure page is protected',
+  description = 'Enter the manage password to configure this addon.',
+  submitLabel = 'Manage password',
+  submit = manageLogin,
+}) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async () => {
+  const run = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      await manageLogin(password);
+      await submit(password);
       onAuthed();
     } catch {
       setError('Wrong password. Try again.');
@@ -28,15 +39,13 @@ const ManageGate: FC<Props> = ({ onAuthed }) => {
   return (
     <div className="border rounded-lg p-6 space-y-4">
       <div className="text-center space-y-1">
-        <h1 className="text-xl font-bold">This Configure page is protected</h1>
-        <p className="text-sm text-muted-foreground">
-          Enter the manage password to configure this addon.
-        </p>
+        <h1 className="text-xl font-bold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void submit();
+          void run();
         }}
         className="space-y-3"
       >
@@ -44,7 +53,7 @@ const ManageGate: FC<Props> = ({ onAuthed }) => {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Manage password"
+          placeholder={submitLabel}
           autoFocus
           disabled={submitting}
         />

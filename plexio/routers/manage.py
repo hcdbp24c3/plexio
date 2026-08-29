@@ -1,10 +1,11 @@
-"""Admin session for the Configure page and the /admin page.
+"""Server admin session, protecting only the /admin page.
 
-A server operator can protect the Configure page with a password
-(``MANAGE_KEY`` env var, or a hash stored in the database). Every /api/v1/manage
-endpoint below is open on purpose; the gate it provides is enforced by the
-frontend plus the admin-only checks in the addon/proxy routers. Login is
-rate-limited per IP; mutating admin endpoints require a valid session.
+``MANAGE_KEY`` (env) or a hash stored in the database is the *server* admin
+password. It gates the /admin page and the admin-only endpoints in this
+router. It never gates the Configure page — each addon configuration has its
+own optional password via the /api/v1/access router (see routers/access.py).
+Login is rate-limited per IP; mutating admin endpoints require a valid
+session.
 """
 
 import hashlib

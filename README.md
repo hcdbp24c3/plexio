@@ -13,14 +13,28 @@ and stream your Plex content directly in Stremio.
 * works with Cinemeta and other IMDB-based addons;
 * handles media without IMDB matching;
 * uses OAuth for safe login without sharing passwords;
-* protects the Configure page with a manage password;
-* server-side admin page with global settings and recorded installations;
+* protects each addon configuration with its own optional password (or none);
+* server-side admin page (gated by `MANAGE_KEY`) with global settings and
+  recorded installations;
 * fully open-source with self-hosting support.
+
+## Passwords, two levels
+
+Like the reference stremio-jellyfin fork, Plexio has two independent password
+levels:
+
+* **Per configuration** — every addon install link (`/…/…/configure`) can be
+  locked with its own password, or left open (default). Whoever sets a
+  password must type it to open the Configure page again; the server admin can
+  reset a lost lock from the same card. Managing the lock happens on the
+  Configure page, in the *Configuration password* card.
+* **Server admin** (`MANAGE_KEY` or the /admin page) — gates only `/admin`.
+  It never blocks the Configure page.
 
 ## Admin page
 
 Point your browser to `<addon-origin>/admin` for the server admin page. What
-you can do there (it requires the manage password when one is set):
+you can do there (it requires the admin password when one is set):
 
 * **Server settings** — server-wide toggles, persisted in the database and
   applied to every addon configuration:
@@ -29,8 +43,8 @@ you can do there (it requires the manage password when one is set):
     config requests.
   * *Admin-only proxy toggle* (`proxy_admin_only`): when on, the proxy toggle
     in the Configure page is only shown to admin sessions.
-* **Manage password** — set the initial password when none is configured yet,
-  or change the existing one. If the operator set `MANAGE_KEY` in the
+* **Manage password** — set the initial admin password when none is configured
+  yet, or change the existing one. If the operator set `MANAGE_KEY` in the
   environment, the API password is managed there and cannot be changed from
   the page.
 * **Installations** — a privacy-minimized list of addon configurations that
@@ -61,9 +75,10 @@ If you'd prefer to self-host Plexio, you can do so easily using Docker. Follow t
   persist here across restarts (`default: :memory:`, i.e. in-process only). In
   Docker, mount a volume at the default `/app/data` so the database survives
   container recreation.
-* *MANAGE_KEY*: Password protecting the Configure page and the `/admin` page.
-  When set, a password screen (admin session cookie) is required before they
-  load; it also unlocks the stream-proxy toggle. Leave empty to keep the pages
+* *MANAGE_KEY*: Server admin password, protecting only the `/admin` page.
+  When set, a password screen (admin session cookie) is required before it
+  loads; it also unlocks the stream-proxy toggle. Per-configuration passwords
+  are independent and live in the database. Leave empty to keep `/admin`
   open.
 * *PROXY_ENABLED*: Server-wide master switch for the media relay. When `false`,
   the relay refuses every request regardless of config (default: `true`).

@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from plexio.cache import init_cache
+from plexio.routers.access import router as access_router
 from plexio.routers.addon import router as addon_router
 from plexio.routers.configuration import router as configuration_router
 from plexio.routers.manage import router as manage_router
@@ -73,6 +74,7 @@ async def rate_limit(request: Request, call_next):
     return await call_next(request)
 
 
+app.include_router(access_router)
 app.include_router(addon_router)
 app.include_router(configuration_router)
 app.include_router(manage_router)

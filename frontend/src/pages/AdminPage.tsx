@@ -219,8 +219,8 @@ const AdminPage: FC = () => {
               </Button>
               <p className="text-sm text-muted-foreground">
                 {passwordConfigured
-                  ? 'Protects the Configure page and this admin page.'
-                  : 'No password is set yet. Setting one locks both the Configure page and this page behind a login.'}
+                  ? 'Protects this admin page. The Configure page is locked per configuration with its own optional password.'
+                  : 'No password is set yet. Setting one locks this page behind a login; each configuration keeps its own optional password.'}
               </p>
             </div>
           </SectionCard>

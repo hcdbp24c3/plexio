@@ -65,6 +65,44 @@ export const setManagePassword = async (password: string): Promise<void> => {
   await axios.post('/api/v1/manage/password', { password });
 };
 
+export interface ConfigAccessStatus {
+  passwordRequired: boolean;
+  unlocked: boolean;
+}
+
+export const getConfigAccessStatus = async (
+  token: string,
+): Promise<ConfigAccessStatus> => {
+  const response = await axios.post<ConfigAccessStatus>(
+    '/api/v1/access/status',
+    { token },
+  );
+  return response.data;
+};
+
+export const configAccessLogin = async (
+  token: string,
+  password: string,
+): Promise<void> => {
+  await axios.post('/api/v1/access/login', { token, password });
+};
+
+export const configAccessLogout = async (token: string): Promise<void> => {
+  await axios.post('/api/v1/access/logout', { token });
+};
+
+export const setConfigAccessPassword = async (
+  token: string,
+  password: string,
+  currentPassword?: string,
+): Promise<boolean> => {
+  const response = await axios.post<{ passwordRequired: boolean }>(
+    '/api/v1/access/password',
+    { token, password, currentPassword },
+  );
+  return response.data.passwordRequired;
+};
+
 export const changeManagePassword = async (
   currentPassword: string,
   newPassword: string,
