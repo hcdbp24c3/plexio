@@ -39,33 +39,22 @@ class TestAccessStatus:
     def test_open_config_has_no_password(self):
         with TestClient(app) as client:
             body = _status(client)
-        assert body == {'passwordRequired': False, 'unlocked': True}
+        assert body == {'passwordRequired': False}
 
-    def test_locked_config_hides_from_visitors(self):
+    def test_locked_config_reports_password_required(self):
         _set_lock()
         with TestClient(app) as client:
             body = _status(client)
-        assert body == {'passwordRequired': True, 'unlocked': False}
+        assert body == {'passwordRequired': True}
 
     def test_admin_session_does_not_bypass_lock(self, monkeypatch):
-        """Like the fork's edit gate: a locked config needs its own password."""
+        """The lock is enforced per page load; admin gets no cookie either."""
         monkeypatch.setattr(settings, 'manage_key', 'admin-secret')
         _set_lock()
         with TestClient(app) as client:
             client.post('/api/v1/manage/login', json={'password': 'admin-secret'})
             body = _status(client)
-        assert body == {'passwordRequired': True, 'unlocked': False}
-
-    def test_unlock_cookie_opens_config(self):
-        _set_lock()
-        with TestClient(app) as client:
-            resp = client.post(
-                '/api/v1/access/login',
-                json={'token': TOKEN, 'password': 'config-pass'},
-            )
-            assert resp.status_code == 204
-            body = _status(client)
-        assert body == {'passwordRequired': True, 'unlocked': True}
+        assert body == {'passwordRequired': True}
 
 
 class TestAccessLogin:
@@ -86,16 +75,18 @@ class TestAccessLogin:
             )
         assert resp.status_code == 409
 
-    def test_logout_locks_again(self):
+    def test_login_is_stateless_no_cookie(self):
+        """Unlock is per page load: login sets no cookie and status stays the
+        same afterwards — the next reload asks for the password again."""
         _set_lock()
         with TestClient(app) as client:
-            client.post(
+            resp = client.post(
                 '/api/v1/access/login',
                 json={'token': TOKEN, 'password': 'config-pass'},
             )
-            assert _status(client)['unlocked'] is True
-            client.post('/api/v1/access/logout', json={'token': TOKEN})
-            assert _status(client)['unlocked'] is False
+            assert resp.status_code == 204
+            assert not client.cookies.jar
+            assert _status(client) == {'passwordRequired': True}
 
 
 class TestAccessPassword:
@@ -174,10 +165,7 @@ class TestAccessPassword:
             assert resp.status_code == 200
             assert resp.json() == {'ok': True, 'passwordRequired': False}
         with TestClient(app) as client:
-            assert _status(client) == {
-                'passwordRequired': False,
-                'unlocked': True,
-            }
+            assert _status(client) == {'passwordRequired': False}
 
     def test_non_admin_remove_needs_current(self, monkeypatch):
         monkeypatch.setattr(settings, 'manage_key', 'admin-secret')

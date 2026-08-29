@@ -67,7 +67,6 @@ export const setManagePassword = async (password: string): Promise<void> => {
 
 export interface ConfigAccessStatus {
   passwordRequired: boolean;
-  unlocked: boolean;
 }
 
 export const getConfigAccessStatus = async (
@@ -80,15 +79,12 @@ export const getConfigAccessStatus = async (
   return response.data;
 };
 
+/** Validates the config password for this page load; no session is kept. */
 export const configAccessLogin = async (
   token: string,
   password: string,
 ): Promise<void> => {
   await axios.post('/api/v1/access/login', { token, password });
-};
-
-export const configAccessLogout = async (token: string): Promise<void> => {
-  await axios.post('/api/v1/access/logout', { token });
 };
 
 export const setConfigAccessPassword = async (

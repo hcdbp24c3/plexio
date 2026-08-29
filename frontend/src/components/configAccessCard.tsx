@@ -63,7 +63,7 @@ const ConfigAccessCard: FC<Props> = ({
         <h2 className="text-lg font-semibold">Configuration password</h2>
         <p className="text-sm text-muted-foreground">
           {passwordRequired
-            ? 'This configuration is protected: visitors must enter this password before they can edit it.'
+            ? 'This configuration is protected: visitors must enter this password to edit it. Unlocking lasts for the current page load only.'
             : 'No password set — anyone with this install link can edit the configuration. Set one to lock it.'}
         </p>
       </div>

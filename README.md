@@ -24,10 +24,11 @@ Like the reference stremio-jellyfin fork, Plexio has two independent password
 levels:
 
 * **Per configuration** — every addon install link (`/…/…/configure`) can be
-  locked with its own password, or left open (default). Whoever sets a
-  password must type it to open the Configure page again; the server admin can
-  reset a lost lock from the same card. Managing the lock happens on the
-  Configure page, in the *Configuration password* card.
+  locked with its own password, or left open (default). Unlocking is
+  stateless: the password is validated for the current page load only, no
+  cookie is kept, so reloading the Configure page asks for it again. The
+  server admin can reset a lost lock from the same card. Managing the lock
+  happens on the Configure page, in the *Configuration password* card.
 * **Server admin** (`MANAGE_KEY` or the /admin page) — gates only `/admin`.
   It never blocks the Configure page.
 

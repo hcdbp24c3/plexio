@@ -24,6 +24,8 @@ const ProtectedFormPage: FC<Props> = ({ plexToken, setPlexToken }) => {
   const {
     status: accessStatus,
     loading: accessLoading,
+    locked: configLocked,
+    unlock: unlockConfig,
     refresh: refreshAccess,
   } = useConfigAccess(configToken);
 
@@ -36,18 +38,13 @@ const ProtectedFormPage: FC<Props> = ({ plexToken, setPlexToken }) => {
     );
   }
 
-  const configLocked =
-    !!configToken &&
-    accessStatus?.passwordRequired === true &&
-    accessStatus?.unlocked === false;
-
   return (
     <div className="mx-auto max-w-2xl">
       <Toaster />
       <Header plexUser={plexUser} setPlexToken={setPlexToken} />
       {configLocked && configToken ? (
         <ManageGate
-          onAuthed={() => void refreshAccess()}
+          onAuthed={unlockConfig}
           title="This configuration is protected"
           description="Enter this configuration's password to edit it."
           submitLabel="Configuration password"
