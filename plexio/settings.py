@@ -23,6 +23,23 @@ class Settings(BaseSettings):
     # reverse proxies that rewrite the Host header). Falls back to the
     # request's own origin.
     addon_base_url: str | None = None
+    # SQLite file for server-owned settings (manage password hash, proxy-token
+    # secret, admin toggles). ':memory:' keeps everything in-process, which is
+    # fine for tests but drops persisted state on restart.
+    db_path: str = ':memory:'
+    # Password protecting the Configure page. When set, an admin session
+    # (HttpOnly cookie) is required to view the form; leave empty to keep the
+    # page open. Takes precedence over a hash stored in the database.
+    manage_key: str | None = None
+    # Server-wide master switch for the media relay. When off, the proxy
+    # refuses every request regardless of what a config asks for.
+    proxy_enabled: bool = True
+    # When true, the stream-proxy toggle only appears for admin sessions.
+    proxy_admin_only: bool = True
+    # Admin session cookie name.
+    manage_cookie_name: str = 'plexio_manage'
+    # Mark the admin cookie Secure (send over HTTPS only).
+    manage_cookie_secure: bool = True
 
 
 settings = Settings()

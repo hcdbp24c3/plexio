@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from plexio.settings import settings
+from plexio.store import get_or_create_server_secret
 
 PROXY_TOKEN_TTL = settings.proxy_token_ttl
 
@@ -30,7 +31,7 @@ BLOCKED_TARGET_HOSTS = (
 
 
 def _aes_key() -> bytes:
-    return hashlib.sha256(settings.proxy_secret.encode()).digest()
+    return hashlib.sha256(get_or_create_server_secret().encode()).digest()
 
 
 def encrypt_payload(data: bytes) -> str:

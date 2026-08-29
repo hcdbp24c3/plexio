@@ -196,8 +196,9 @@ class PlexMediaMeta(BaseModel):
         proxy_base=None,
     ):
         from plexio.models.stremio import StremioStream
+        from plexio.store import get_proxy_enabled
 
-        stream_proxy = configuration.stream_proxy
+        stream_proxy = configuration.stream_proxy and get_proxy_enabled()
         streams = []
         for i, media in enumerate(self.media):
             name = f'{server.server_name} {self.library_section_title}'

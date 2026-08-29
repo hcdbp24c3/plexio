@@ -4,11 +4,13 @@ import Loading from '@/components/loading.tsx';
 import Login from '@/components/login.tsx';
 import { useAddonConfigFromUrl } from '@/hooks/useAddonConfigFromUrl.ts';
 import usePlexServers from '@/hooks/usePlexServers.tsx';
+import { ManageStatus } from '@/services/ManageService.tsx';
 import { PlexUser } from '@/types/plex.tsx';
 
 interface Props {
   plexToken: string | null;
   plexUser: PlexUser | null | undefined;
+  manageStatus: ManageStatus | null;
 }
 
 const NoServersMessage: FC = () => (
@@ -22,7 +24,7 @@ const NoServersMessage: FC = () => (
   </div>
 );
 
-const ProtectedForm: FC<Props> = ({ plexToken, plexUser }) => {
+const ProtectedForm: FC<Props> = ({ plexToken, plexUser, manageStatus }) => {
   const { servers, ready } = usePlexServers(plexToken);
   const initialConfig = useAddonConfigFromUrl();
 
@@ -38,7 +40,15 @@ const ProtectedForm: FC<Props> = ({ plexToken, plexUser }) => {
     return <NoServersMessage />;
   }
 
-  return <ConfigurationForm servers={servers} initialConfig={initialConfig} />;
+  return (
+    <ConfigurationForm
+      servers={servers}
+      initialConfig={initialConfig}
+      admin={manageStatus?.admin ?? false}
+      proxyEnabled={manageStatus?.proxyEnabled ?? true}
+      proxyAdminOnly={manageStatus?.proxyAdminOnly ?? true}
+    />
+  );
 };
 
 export default ProtectedForm;

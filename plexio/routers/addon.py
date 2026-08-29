@@ -32,6 +32,7 @@ from plexio.plex.media_server_api import (
     stremio_to_plex_id,
 )
 from plexio.settings import settings
+from plexio.store import get_proxy_enabled
 
 router = APIRouter()
 router.dependencies.append(Depends(set_sentry_user))
@@ -41,6 +42,11 @@ def _proxy_base(request: Request) -> str | None:
     if settings.addon_base_url:
         return settings.addon_base_url.rstrip('/')
     return str(request.base_url).rstrip('/')
+
+
+def _stream_proxy(configuration: AddonConfiguration) -> bool:
+    """Honor the config's proxy request only while the relay is enabled."""
+    return bool(configuration.stream_proxy) and get_proxy_enabled()
 
 
 async def _gather_media(
@@ -208,7 +214,7 @@ async def get_catalog(
             m.to_stremio_meta_review(
                 server,
                 server_index=server_index,
-                stream_proxy=configuration.stream_proxy,
+                stream_proxy=_stream_proxy(configuration),
                 proxy_base=proxy_base,
             )
             for m in media
@@ -232,7 +238,7 @@ async def get_meta(
 
     server_index, guid = parse_plexio_id(plex_id)
     proxy_base = _proxy_base(request)
-    stream_proxy = configuration.stream_proxy
+    stream_proxy = _stream_proxy(configuration)
 
     # Determined server: query only that server
     if server_index is not None and 0 <= server_index < len(configuration.servers):

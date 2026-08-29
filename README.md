@@ -33,6 +33,20 @@ If you'd prefer to self-host Plexio, you can do so easily using Docker. Follow t
 * *REDIS_URL*: URL for a Redis instance if you use `redis` cache (default: `redis://redis:6399/0`).
 * *PLEX_MATCHING_TOKEN*: Auth token for Plex media matching (default: `None`).
 * *SENTRY_DSN*: DSN for error tracking with Sentry (default: `None`).
+* *DB_PATH*: SQLite file for server-owned settings — the manage password hash,
+  the proxy-token encryption secret and admin toggles persist here across
+  restarts (`default: :memory:`, i.e. in-process only). In Docker, mount a
+  volume at the default `/app/data` so the database survives container
+  recreation.
+* *MANAGE_KEY*: Password protecting the Configure page. When set, a password
+  screen (admin session cookie) is required before the form loads; it also
+  unlocks the stream-proxy toggle. Leave empty to keep the page open.
+* *PROXY_ENABLED*: Server-wide master switch for the media relay. When `false`,
+  the relay refuses every request regardless of config (default: `true`).
+* *PROXY_ADMIN_ONLY*: When `true`, the stream-proxy toggle is only offered to
+  admin sessions (default: `true`).
+* *MANAGE_COOKIE_SECURE*: Mark the admin cookie `Secure` (HTTPS only)
+  (default: `true`). Set to `false` only for plain-HTTP testing.
 
 ### Using addon with shared Plex server
 If you are using Plexio with a Plex server that you do not own (you will see a "shared" badge 

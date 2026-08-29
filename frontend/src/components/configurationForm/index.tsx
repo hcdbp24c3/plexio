@@ -26,6 +26,12 @@ interface Props {
   servers: PlexServer[];
   /** Parsed config from the install URL, if the page was opened from one. */
   initialConfig?: ConfigurationFormType | null;
+  /** Whether this session holds the manage (admin) password. */
+  admin?: boolean;
+  /** Server-wide master switch for the media relay. */
+  proxyEnabled?: boolean;
+  /** Whether the proxy toggle requires an admin session. */
+  proxyAdminOnly?: boolean;
 }
 
 const defaultFormValues = (): ConfigurationFormType => ({
@@ -38,7 +44,13 @@ const defaultFormValues = (): ConfigurationFormType => ({
   streamProxy: false,
 });
 
-const ConfigurationForm: FC<Props> = ({ servers, initialConfig }) => {
+const ConfigurationForm: FC<Props> = ({
+  servers,
+  initialConfig,
+  admin = false,
+  proxyEnabled = true,
+  proxyAdminOnly = true,
+}) => {
   const form = useForm<ConfigurationFormType>({
     resolver: zodResolver(formSchema),
     defaultValues: initialConfig ?? defaultFormValues(),
@@ -99,7 +111,8 @@ const ConfigurationForm: FC<Props> = ({ servers, initialConfig }) => {
       includeTranscodeDown: configuration.includeTranscodeDown,
       transcodeDownQualities: configuration.transcodeDownQualities ?? [],
       includePlexTv: configuration.includePlexTv,
-      streamProxy: configuration.streamProxy,
+      streamProxy:
+        proxyAdminOnly && !admin ? false : configuration.streamProxy,
       version: __APP_VERSION__,
     };
 
@@ -155,7 +168,13 @@ const ConfigurationForm: FC<Props> = ({ servers, initialConfig }) => {
         <IncludeTranscodeOriginalField form={form} />
         <IncludeTranscodeDownFields form={form} />
         <IncludePlexTvField form={form} />
-        <StreamProxyField form={form} />
+        {proxyEnabled && (!proxyAdminOnly || admin) ? (
+          <StreamProxyField form={form} />
+        ) : (
+          <div className="rounded-lg border p-2 text-sm text-muted-foreground">
+            The stream proxy is disabled on this server.
+          </div>
+        )}
 
         <div className="flex items-center space-x-1 justify-center p-3">
           <Button

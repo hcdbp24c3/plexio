@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from plexio.dependencies import get_http_client
 from plexio.security import mint_proxy_token, unmint_proxy_token
 from plexio.settings import settings
+from plexio.store import get_proxy_enabled
 
 router = APIRouter()
 
@@ -119,4 +120,9 @@ async def proxy(
     http: Annotated[ClientSession, Depends(get_http_client)],
     token: str,
 ) -> Response:
+    if not get_proxy_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Media relay is disabled',
+        )
     return await _relay(request, http, token)

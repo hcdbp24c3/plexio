@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from plexio.cache import init_cache
 from plexio.routers.addon import router as addon_router
 from plexio.routers.configuration import router as configuration_router
+from plexio.routers.manage import router as manage_router
 from plexio.routers.proxy import router as proxy_router
 from plexio.security import RateLimiter, client_ip
 from plexio.settings import settings
@@ -74,6 +75,7 @@ async def rate_limit(request: Request, call_next):
 
 app.include_router(addon_router)
 app.include_router(configuration_router)
+app.include_router(manage_router)
 app.include_router(proxy_router)
 
 
