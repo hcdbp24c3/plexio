@@ -1,5 +1,6 @@
 import secrets
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 from plexio.cache import CacheType
@@ -27,9 +28,9 @@ class Settings(BaseSettings):
     # secret, admin toggles). ':memory:' keeps everything in-process, which is
     # fine for tests but drops persisted state on restart.
     db_path: str = ':memory:'
-    # Password protecting the Configure page. When set, an admin session
-    # (HttpOnly cookie) is required to view the form; leave empty to keep the
-    # page open. Takes precedence over a hash stored in the database.
+    # Server admin password, protecting only the /admin page. When set, an
+    # admin session (HttpOnly cookie) is required to open it; leave empty to
+    # keep it open. Takes precedence over a hash stored in the database.
     manage_key: str | None = None
     # Server-wide master switch for the media relay. When off, the proxy
     # refuses every request regardless of what a config asks for.
@@ -40,6 +41,22 @@ class Settings(BaseSettings):
     manage_cookie_name: str = 'plexio_manage'
     # Mark the admin cookie Secure (send over HTTPS only).
     manage_cookie_secure: bool = True
+
+    @field_validator(
+        'cors_origin_regex',
+        'redis_url',
+        'plex_matching_token',
+        'proxy_secret',
+        'addon_base_url',
+        'db_path',
+        'manage_key',
+        mode='before',
+    )
+    @classmethod
+    def _coerce_env_string(cls, v):
+        # pydantic-settings 2.0 JSON-decodes env values, so a numeric password
+        # like MANAGE_KEY=11042006 arrives as an int. Stringify it back.
+        return None if v is None else str(v)
 
 
 settings = Settings()
