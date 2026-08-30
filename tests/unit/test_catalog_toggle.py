@@ -193,7 +193,7 @@ class _FakeStreamMedia:
     def __init__(self, guid):
         self.guid = guid
 
-    def get_stremio_streams(self, server, configuration, *, proxy_base=None):
+    def get_stremio_streams(self, server, configuration, *, proxy_base=None, installation_id=None):
         return [
             StremioStream(
                 name=server.server_name,

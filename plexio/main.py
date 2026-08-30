@@ -11,6 +11,7 @@ from plexio.routers.addon import router as addon_router
 from plexio.routers.configuration import router as configuration_router
 from plexio.routers.manage import router as manage_router
 from plexio.routers.proxy import router as proxy_router
+from plexio.routers.u import router as u_router
 from plexio.security import RateLimiter, client_ip
 from plexio.settings import settings
 
@@ -74,6 +75,9 @@ async def rate_limit(request: Request, call_next):
     return await call_next(request)
 
 
+# u_router before addon_router: /u/<id>/manifest.json must not be captured
+# by the addon's /{installation_id}/{base64_cfg}/manifest.json route.
+app.include_router(u_router)
 app.include_router(access_router)
 app.include_router(addon_router)
 app.include_router(configuration_router)

@@ -203,27 +203,62 @@ class TestAdminApi:
         with TestClient(app) as client:
             anon = client.get('/api/v1/manage/configs')
             assert anon.status_code == 401
-            anon_post = client.post('/api/v1/manage/configs', json={'config': config})
-            assert anon_post.status_code == 401
+
+            # Recording is open — any visitor saves their own setup.
+            anon_post = client.post(
+                '/api/v1/manage/configs',
+                json={'config': config, 'id': 'my-setup'},
+            )
+            assert anon_post.status_code == 200
+            assert anon_post.json()['id'] == 'my-setup'
 
             self._login(client)
-            created = client.post('/api/v1/manage/configs', json={'config': config})
+            created = client.post(
+                '/api/v1/manage/configs', json={'config': config}
+            )
             assert created.status_code == 200
             config_id = created.json()['id']
+            assert config_id != 'my-setup'
 
             listing = client.get('/api/v1/manage/configs')
             assert listing.status_code == 200
             items = listing.json()
-            assert len(items) == 1
-            assert items[0]['id'] == config_id
-            assert items[0]['name'] == 'Alpha, Beta'
-            assert items[0]['serverCount'] == 2
-            assert 'accessToken' not in str(items[0])
+            assert {i['id'] for i in items} == {'my-setup', config_id}
+            mine = next(i for i in items if i['id'] == 'my-setup')
+            assert mine['name'] == 'Alpha, Beta'
+            assert mine['serverCount'] == 2
+            assert mine['proxyOverride'] is None
+            assert mine['configProxy'] is False
+            assert 'accessToken' not in str(items)
 
             deleted = client.delete(f'/api/v1/manage/configs/{config_id}')
             assert deleted.status_code == 204
-            assert client.get('/api/v1/manage/configs').json() == []
+            assert len(client.get('/api/v1/manage/configs').json()) == 1
             missing = client.delete(f'/api/v1/manage/configs/{config_id}')
+            assert missing.status_code == 404
+
+    def test_set_config_proxy_endpoint(self, monkeypatch):
+        monkeypatch.setattr(settings, 'manage_key', 'hunter2-secret')
+        from plexio.store import get_store
+
+        get_store().save_config({'streamProxy': True}, 'Setup', 'setup-1')
+        with TestClient(app) as client:
+            assert client.put(
+                '/api/v1/manage/configs/setup-1/proxy', json={'enabled': False}
+            ).status_code == 401  # admin only
+            self._login(client)
+            ok = client.put(
+                '/api/v1/manage/configs/setup-1/proxy', json={'enabled': False}
+            )
+            assert ok.status_code == 200
+            assert ok.json() == {'ok': True, 'proxyOverride': False}
+            assert (
+                client.get('/api/v1/manage/configs').json()[0]['proxyOverride']
+                is False
+            )
+            missing = client.put(
+                '/api/v1/manage/configs/nope/proxy', json={'enabled': True}
+            )
             assert missing.status_code == 404
 
 
@@ -244,12 +279,27 @@ class TestProxyEnforcement:
     def test_stream_proxy_guard_honors_server_switch(self):
         from types import SimpleNamespace
 
-        from plexio.routers.addon import _stream_proxy
-        from plexio.store import get_store
+        from plexio.store import effective_stream_proxy, get_store
 
         cfg = SimpleNamespace(stream_proxy=True)
-        assert _stream_proxy(cfg) is True
+        assert effective_stream_proxy(cfg, None) is True
         get_store().set_setting('proxy_enabled', False)
-        assert _stream_proxy(cfg) is False
+        assert effective_stream_proxy(cfg, None) is False
         cfg.stream_proxy = False
-        assert _stream_proxy(cfg) is False
+        assert effective_stream_proxy(cfg, None) is False
+
+    def test_proxy_override_wins_over_config_flag(self):
+        from types import SimpleNamespace
+
+        from plexio.store import effective_stream_proxy, get_store
+
+        cfg = SimpleNamespace(stream_proxy=True)
+        get_store().set_proxy_override('setup-1', False)
+        assert effective_stream_proxy(cfg, 'setup-1') is False
+        cfg.stream_proxy = False
+        get_store().set_proxy_override('setup-2', True)
+        assert effective_stream_proxy(cfg, 'setup-2') is True
+        # No override: the config's own flag decides.
+        assert effective_stream_proxy(cfg, 'setup-3') is False
+
+

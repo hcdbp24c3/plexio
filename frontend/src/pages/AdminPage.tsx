@@ -15,6 +15,7 @@ import {
   ManageConfigItem,
   manageLogout,
   saveManageSettings,
+  setConfigProxy,
   setManagePassword,
 } from '@/services/ManageService.tsx';
 
@@ -127,6 +128,24 @@ const AdminPage: FC = () => {
     }
   };
 
+  const toggleConfigProxy = async (item: ManageConfigItem) => {
+    const enabled = !(item.proxyOverride ?? item.configProxy);
+    try {
+      await setConfigProxy(item.id, enabled);
+      setConfigs((items) =>
+        items.map((c) => (c.id === item.id ? { ...c, proxyOverride: enabled } : c)),
+      );
+      toast({
+        title: enabled ? 'Stream proxy enabled for this configuration' : 'Stream proxy disabled for this configuration',
+      });
+    } catch {
+      toast({
+        title: 'Could not update proxy setting',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const logout = async () => {
     await manageLogout();
     await refresh();
@@ -226,13 +245,17 @@ const AdminPage: FC = () => {
           </SectionCard>
 
           <SectionCard title="Installations">
+            <p className="text-sm text-muted-foreground">
+              Every saved configuration is listed here. Use the proxy switch
+              to force the media relay on or off for one configuration.
+            </p>
             <div className="space-y-2">
               {configsLoading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : configs.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No installations recorded yet. Configs are recorded here
-                  whenever an admin saves the Configure page.
+                  whenever someone saves the Configure page.
                 </p>
               ) : (
                 configs.map((item) => (
@@ -248,13 +271,23 @@ const AdminPage: FC = () => {
                         {new Date(item.createdAt * 1000).toLocaleDateString()}
                       </p>
                     </div>
-                    <Button
-                      onClick={() => void removeConfig(item.id)}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      Remove
-                    </Button>
+                    <div className="flex shrink-0 items-center space-x-3">
+                      <label className="flex items-center space-x-2 text-sm">
+                        <Switch
+                          checked={item.proxyOverride ?? item.configProxy}
+                          onCheckedChange={() => void toggleConfigProxy(item)}
+                          aria-label="Stream proxy"
+                        />
+                        <span>Proxy</span>
+                      </label>
+                      <Button
+                        onClick={() => void removeConfig(item.id)}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}

@@ -43,7 +43,12 @@ class Store:
     def set_secret(self, value: str) -> None:
         raise NotImplementedError
 
-    def save_config(self, config: dict, name: str) -> str:
+    def save_config(
+        self, config: dict, name: str, config_id: str | None = None
+    ) -> str:
+        raise NotImplementedError
+
+    def get_config(self, config_id: str) -> dict | None:
         raise NotImplementedError
 
     def list_configs(self) -> list[dict]:
@@ -51,6 +56,14 @@ class Store:
 
     def delete_config(self, config_id: str) -> bool:
         raise NotImplementedError
+
+    def get_proxy_override(self, config_id: str) -> bool | None:
+        """Per-config relay override set from /admin, or None to follow the
+        config's own ``stream_proxy`` flag."""
+        return self.get_setting(f'proxy:{config_id}')
+
+    def set_proxy_override(self, config_id: str, enabled: bool) -> None:
+        self.set_setting(f'proxy:{config_id}', enabled)
 
 
 class MemoryStore(Store):
@@ -80,8 +93,10 @@ class MemoryStore(Store):
         with self._lock:
             self._kv['server_secret'] = value
 
-    def save_config(self, config: dict, name: str) -> str:
-        config_id = random_id()
+    def save_config(
+        self, config: dict, name: str, config_id: str | None = None
+    ) -> str:
+        config_id = config_id or random_id()
         with self._lock:
             self._configs[config_id] = {
                 'id': config_id,
@@ -90,6 +105,11 @@ class MemoryStore(Store):
                 'created_at': int(time.time()),
             }
         return config_id
+
+    def get_config(self, config_id: str) -> dict | None:
+        with self._lock:
+            entry = self._configs.get(config_id)
+        return entry['config'] if entry else None
 
     def list_configs(self) -> list[dict]:
         with self._lock:
@@ -156,16 +176,27 @@ class SqliteStore(Store):
     def set_secret(self, value: str) -> None:
         self._set('server_secret', value)
 
-    def save_config(self, config: dict, name: str) -> str:
-        config_id = random_id()
+    def save_config(
+        self, config: dict, name: str, config_id: str | None = None
+    ) -> str:
+        config_id = config_id or random_id()
         with self._lock:
             self._conn.execute(
                 'INSERT INTO configs (id, name, config_json, created_at) '
-                'VALUES (?, ?, ?, ?)',
+                'VALUES (?, ?, ?, ?) '
+                'ON CONFLICT(id) DO UPDATE SET '
+                'name = excluded.name, config_json = excluded.config_json',
                 (config_id, name, json.dumps(config), int(time.time())),
             )
             self._conn.commit()
         return config_id
+
+    def get_config(self, config_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                'SELECT config_json FROM configs WHERE id = ?', (config_id,)
+            ).fetchone()
+        return json.loads(row['config_json']) if row else None
 
     def list_configs(self) -> list[dict]:
         with self._lock:
@@ -249,3 +280,18 @@ def get_proxy_admin_only() -> bool:
     """Whether the stream-proxy toggle requires an admin session."""
     value = get_store().get_setting('proxy_admin_only')
     return settings.proxy_admin_only if value is None else bool(value)
+
+
+def effective_stream_proxy(config, installation_id: str | None) -> bool:
+    """Whether this install relays media through the proxy.
+
+    An admin override (proxy:<id>) wins over the config's own flag; the
+    server-wide master switch must be on either way.
+    """
+    if not get_proxy_enabled():
+        return False
+    if installation_id:
+        override = get_store().get_proxy_override(installation_id)
+        if override is not None:
+            return bool(override)
+    return bool(config.stream_proxy)

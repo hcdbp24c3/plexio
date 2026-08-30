@@ -7,15 +7,16 @@ import {
 /**
  * Per-config unlock is stateless: the backend validates the password once per
  * page load and keeps no cookie, so `unlocked` lives only in React state and
- * resets on every reload (F5) — matching the reference fork.
+ * resets on every reload (F5) — matching the reference fork. The lock is keyed
+ * by the installation id, so it survives config edits.
  */
-export const useConfigAccess = (token: string | null) => {
+export const useConfigAccess = (id: string | null) => {
   const [status, setStatus] = useState<ConfigAccessStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!token) {
+    if (!id) {
       setStatus(null);
       setLoading(false);
       setUnlocked(false);
@@ -23,13 +24,13 @@ export const useConfigAccess = (token: string | null) => {
     }
     setLoading(true);
     try {
-      setStatus(await getConfigAccessStatus(token));
+      setStatus(await getConfigAccessStatus(id));
     } catch {
       setStatus(null);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [id]);
 
   useEffect(() => {
     void refresh();
@@ -37,7 +38,7 @@ export const useConfigAccess = (token: string | null) => {
 
   const unlock = useCallback(() => setUnlocked(true), []);
 
-  const locked = !!token && status?.passwordRequired === true && !unlocked;
+  const locked = !!id && status?.passwordRequired === true && !unlocked;
 
   return { status, loading, locked, unlock, refresh };
 };

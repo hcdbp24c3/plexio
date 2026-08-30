@@ -3,14 +3,13 @@ import ConfigurationForm from '@/components/configurationForm';
 import Loading from '@/components/loading.tsx';
 import Login from '@/components/login.tsx';
 import { useAddonConfigFromUrl } from '@/hooks/useAddonConfigFromUrl.ts';
+import { useConfigRoute } from '@/hooks/useConfigRoute.ts';
 import usePlexServers from '@/hooks/usePlexServers.tsx';
-import { ManageStatus } from '@/services/ManageService.tsx';
 import { PlexUser } from '@/types/plex.tsx';
 
 interface Props {
   plexToken: string | null;
   plexUser: PlexUser | null | undefined;
-  manageStatus: ManageStatus | null;
 }
 
 const NoServersMessage: FC = () => (
@@ -24,9 +23,10 @@ const NoServersMessage: FC = () => (
   </div>
 );
 
-const ProtectedForm: FC<Props> = ({ plexToken, plexUser, manageStatus }) => {
+const ProtectedForm: FC<Props> = ({ plexToken, plexUser }) => {
   const { servers, ready } = usePlexServers(plexToken);
   const initialConfig = useAddonConfigFromUrl();
+  const configRoute = useConfigRoute();
 
   if (plexUser === null) {
     return <Login />;
@@ -44,9 +44,7 @@ const ProtectedForm: FC<Props> = ({ plexToken, plexUser, manageStatus }) => {
     <ConfigurationForm
       servers={servers}
       initialConfig={initialConfig}
-      admin={manageStatus?.admin ?? false}
-      proxyEnabled={manageStatus?.proxyEnabled ?? true}
-      proxyAdminOnly={manageStatus?.proxyAdminOnly ?? true}
+      configId={configRoute?.id}
     />
   );
 };

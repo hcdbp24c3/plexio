@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { parseAddonUrl } from '@/components/configurationForm/utils.tsx';
 import { ConfigurationFormType } from '@/components/configurationForm/formSchema.tsx';
+import { useConfigRoute } from '@/hooks/useConfigRoute.ts';
 
 /**
  * Read the config token from an install/edit URL of the shape
@@ -9,11 +10,8 @@ import { ConfigurationFormType } from '@/components/configurationForm/formSchema
  * Returns null for any other path (fresh configure page).
  */
 export const useAddonConfigFromUrl = (): ConfigurationFormType | null => {
+  const route = useConfigRoute();
   return useMemo(() => {
-    const match = window.location.pathname.match(
-      /^\/[^/]+\/([^/]+)\/(?:configure)?\/?$/,
-    );
-    if (!match) return null;
-    return parseAddonUrl(match[1]);
-  }, []);
+    return route ? parseAddonUrl(route.token) : null;
+  }, [route]);
 };

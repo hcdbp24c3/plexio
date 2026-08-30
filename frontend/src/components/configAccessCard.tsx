@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/useToast';
 import { setConfigAccessPassword } from '@/services/ManageService.tsx';
 
 interface Props {
-  token: string;
+  id: string;
   passwordRequired: boolean;
   /** Whether the session holds an admin cookie (can reset the lock). */
   admin: boolean;
@@ -14,7 +14,7 @@ interface Props {
 }
 
 const ConfigAccessCard: FC<Props> = ({
-  token,
+  id,
   passwordRequired,
   admin,
   onChanged,
@@ -34,7 +34,7 @@ const ConfigAccessCard: FC<Props> = ({
     setBusy(true);
     try {
       const locked = await setConfigAccessPassword(
-        token,
+        id,
         password,
         admin ? undefined : currentPassword || undefined,
       );

@@ -10,7 +10,6 @@ import {
   IncludePlexTvField,
   ServerCheckboxListField,
   PerServerConfig,
-  StreamProxyField,
   EditAddonUrlField,
 } from '@/components/configurationForm/fields';
 import {
@@ -27,12 +26,8 @@ interface Props {
   servers: PlexServer[];
   /** Parsed config from the install URL, if the page was opened from one. */
   initialConfig?: ConfigurationFormType | null;
-  /** Whether this session holds the manage (admin) password. */
-  admin?: boolean;
-  /** Server-wide master switch for the media relay. */
-  proxyEnabled?: boolean;
-  /** Whether the proxy toggle requires an admin session. */
-  proxyAdminOnly?: boolean;
+  /** The installation id from the URL, if editing a saved setup. */
+  configId?: string | null;
 }
 
 const defaultFormValues = (): ConfigurationFormType => ({
@@ -48,9 +43,7 @@ const defaultFormValues = (): ConfigurationFormType => ({
 const ConfigurationForm: FC<Props> = ({
   servers,
   initialConfig,
-  admin = false,
-  proxyEnabled = true,
-  proxyAdminOnly = true,
+  configId = null,
 }) => {
   const form = useForm<ConfigurationFormType>({
     resolver: zodResolver(formSchema),
@@ -112,17 +105,17 @@ const ConfigurationForm: FC<Props> = ({
       includeTranscodeDown: configuration.includeTranscodeDown,
       transcodeDownQualities: configuration.transcodeDownQualities ?? [],
       includePlexTv: configuration.includePlexTv,
-      streamProxy:
-        proxyAdminOnly && !admin ? false : configuration.streamProxy,
+      streamProxy: configuration.streamProxy,
       version: __APP_VERSION__,
     };
 
     const encodedConfiguration = base64_url_encode(JSON.stringify(payload));
-    const addonUrl = `${window.location.origin}/${uuidv4()}/${encodedConfiguration}/manifest.json`;
+    // Editing a saved setup keeps its id (and its password/proxy settings);
+    // a fresh setup gets a new id and lands on its own /u/<id> page.
+    const id = configId ?? uuidv4();
+    const addonUrl = `${window.location.origin}/${id}/${encodedConfiguration}/manifest.json`;
 
-    if (admin) {
-      recordConfig(payload);
-    }
+    recordConfig(payload, id);
 
     const submitter = (event?.nativeEvent as SubmitEvent)?.submitter as
       | HTMLButtonElement
@@ -130,7 +123,7 @@ const ConfigurationForm: FC<Props> = ({
     if (submitter?.name === 'clipboard') {
       void navigator.clipboard.writeText(addonUrl);
     } else {
-      window.location.href = addonUrl.replace(/https?:\/\//, 'stremio://');
+      window.location.href = `${window.location.origin}/u/${id}`;
     }
   }
 
@@ -173,13 +166,6 @@ const ConfigurationForm: FC<Props> = ({
         <IncludeTranscodeOriginalField form={form} />
         <IncludeTranscodeDownFields form={form} />
         <IncludePlexTvField form={form} />
-        {proxyEnabled && (!proxyAdminOnly || admin) ? (
-          <StreamProxyField form={form} />
-        ) : (
-          <div className="rounded-lg border p-2 text-sm text-muted-foreground">
-            The stream proxy is disabled on this server.
-          </div>
-        )}
 
         <div className="flex items-center space-x-1 justify-center p-3">
           <Button

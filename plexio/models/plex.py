@@ -194,11 +194,12 @@ class PlexMediaMeta(BaseModel):
         configuration,
         *,
         proxy_base=None,
+        installation_id=None,
     ):
         from plexio.models.stremio import StremioStream
-        from plexio.store import get_proxy_enabled
+        from plexio.store import effective_stream_proxy
 
-        stream_proxy = configuration.stream_proxy and get_proxy_enabled()
+        stream_proxy = effective_stream_proxy(configuration, installation_id)
         streams = []
         for i, media in enumerate(self.media):
             name = f'{server.server_name} {self.library_section_title}'

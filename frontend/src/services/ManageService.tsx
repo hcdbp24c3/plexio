@@ -40,6 +40,9 @@ export interface ManageConfigItem {
   name: string;
   serverCount: number;
   createdAt: number;
+  /** Admin-forced relay setting, or null to follow the config's own flag. */
+  proxyOverride: boolean | null;
+  configProxy: boolean;
 }
 
 export const listManageConfigs = async (): Promise<ManageConfigItem[]> => {
@@ -51,12 +54,22 @@ export const deleteManageConfig = async (id: string): Promise<void> => {
   await axios.delete(`/api/v1/manage/configs/${id}`);
 };
 
-export const recordConfig = (config: Record<string, unknown>): void => {
-  // keepalive survives the immediate navigation to the stremio:// install link.
+export const setConfigProxy = async (
+  id: string,
+  enabled: boolean,
+): Promise<void> => {
+  await axios.put(`/api/v1/manage/configs/${id}/proxy`, { enabled });
+};
+
+export const recordConfig = (
+  config: Record<string, unknown>,
+  id: string,
+): void => {
+  // keepalive survives the immediate navigation away from the form.
   void fetch('/api/v1/manage/configs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ config }),
+    body: JSON.stringify({ id, config }),
     keepalive: true,
   }).catch(() => undefined);
 };
@@ -70,31 +83,31 @@ export interface ConfigAccessStatus {
 }
 
 export const getConfigAccessStatus = async (
-  token: string,
+  id: string,
 ): Promise<ConfigAccessStatus> => {
   const response = await axios.post<ConfigAccessStatus>(
     '/api/v1/access/status',
-    { token },
+    { id },
   );
   return response.data;
 };
 
 /** Validates the config password for this page load; no session is kept. */
 export const configAccessLogin = async (
-  token: string,
+  id: string,
   password: string,
 ): Promise<void> => {
-  await axios.post('/api/v1/access/login', { token, password });
+  await axios.post('/api/v1/access/login', { id, password });
 };
 
 export const setConfigAccessPassword = async (
-  token: string,
+  id: string,
   password: string,
   currentPassword?: string,
 ): Promise<boolean> => {
   const response = await axios.post<{ passwordRequired: boolean }>(
     '/api/v1/access/password',
-    { token, password, currentPassword },
+    { id, password, currentPassword },
   );
   return response.data.passwordRequired;
 };

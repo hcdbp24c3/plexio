@@ -7,7 +7,7 @@ from plexio.security import RateLimiter
 from plexio.settings import settings
 from plexio.store import reset_store
 
-TOKEN = 'very-long-config-token'
+CONFIG_ID = 'very-long-config-id'
 
 
 @pytest.fixture(autouse=True)
@@ -24,14 +24,14 @@ def clean_state(monkeypatch):
     reset_store()
 
 
-def _status(client: TestClient, token: str = TOKEN):
-    return client.post('/api/v1/access/status', json={'token': token}).json()
+def _status(client: TestClient, config_id: str = CONFIG_ID):
+    return client.post('/api/v1/access/status', json={'id': config_id}).json()
 
 
-def _set_lock(password: str = 'config-pass', token: str = TOKEN):
+def _set_lock(password: str = 'config-pass', config_id: str = CONFIG_ID):
     with TestClient(app) as client:
         client.post(
-            '/api/v1/access/password', json={'token': token, 'password': password}
+            '/api/v1/access/password', json={'id': config_id, 'password': password}
         )
 
 
@@ -63,7 +63,7 @@ class TestAccessLogin:
         with TestClient(app) as client:
             resp = client.post(
                 '/api/v1/access/login',
-                json={'token': TOKEN, 'password': 'nope'},
+                json={'id': CONFIG_ID, 'password': 'nope'},
             )
         assert resp.status_code == 401
 
@@ -71,7 +71,7 @@ class TestAccessLogin:
         with TestClient(app) as client:
             resp = client.post(
                 '/api/v1/access/login',
-                json={'token': TOKEN, 'password': 'x' * 8},
+                json={'id': CONFIG_ID, 'password': 'x' * 8},
             )
         assert resp.status_code == 409
 
@@ -82,7 +82,7 @@ class TestAccessLogin:
         with TestClient(app) as client:
             resp = client.post(
                 '/api/v1/access/login',
-                json={'token': TOKEN, 'password': 'config-pass'},
+                json={'id': CONFIG_ID, 'password': 'config-pass'},
             )
             assert resp.status_code == 204
             assert not client.cookies.jar
@@ -94,7 +94,7 @@ class TestAccessPassword:
         with TestClient(app) as client:
             resp = client.post(
                 '/api/v1/access/password',
-                json={'token': TOKEN, 'password': 'new-pass-1'},
+                json={'id': CONFIG_ID, 'password': 'new-pass-1'},
             )
             assert resp.status_code == 200
             assert resp.json() == {'ok': True, 'passwordRequired': True}
@@ -106,13 +106,13 @@ class TestAccessPassword:
         with TestClient(app) as client:
             resp = client.post(
                 '/api/v1/access/password',
-                json={'token': TOKEN, 'password': 'new-pass-1'},
+                json={'id': CONFIG_ID, 'password': 'new-pass-1'},
             )
             assert resp.status_code == 401
             ok = client.post(
                 '/api/v1/access/password',
                 json={
-                    'token': TOKEN,
+                    'id': CONFIG_ID,
                     'password': 'new-pass-1',
                     'currentPassword': 'config-pass',
                 },
@@ -121,12 +121,12 @@ class TestAccessPassword:
         with TestClient(app) as client:
             old = client.post(
                 '/api/v1/access/login',
-                json={'token': TOKEN, 'password': 'config-pass'},
+                json={'id': CONFIG_ID, 'password': 'config-pass'},
             )
             assert old.status_code == 401
             fresh = client.post(
                 '/api/v1/access/login',
-                json={'token': TOKEN, 'password': 'new-pass-1'},
+                json={'id': CONFIG_ID, 'password': 'new-pass-1'},
             )
             assert fresh.status_code == 204
 
@@ -136,7 +136,7 @@ class TestAccessPassword:
         with TestClient(app) as client:
             resp = client.post(
                 '/api/v1/access/password',
-                json={'token': TOKEN, 'password': 'new-pass-1'},
+                json={'id': CONFIG_ID, 'password': 'new-pass-1'},
             )
             assert resp.status_code == 200
 
@@ -147,7 +147,7 @@ class TestAccessPassword:
             client.post('/api/v1/manage/login', json={'password': 'admin-secret'})
             resp = client.post(
                 '/api/v1/access/password',
-                json={'token': TOKEN, 'password': 'admin-forced'},
+                json={'id': CONFIG_ID, 'password': 'admin-forced'},
             )
             assert resp.status_code == 200
 
@@ -156,11 +156,11 @@ class TestAccessPassword:
         with TestClient(app) as client:
             client.post(
                 '/api/v1/access/login',
-                json={'token': TOKEN, 'password': 'config-pass'},
+                json={'id': CONFIG_ID, 'password': 'config-pass'},
             )
             resp = client.post(
                 '/api/v1/access/password',
-                json={'token': TOKEN, 'password': ''},
+                json={'id': CONFIG_ID, 'password': ''},
             )
             assert resp.status_code == 200
             assert resp.json() == {'ok': True, 'passwordRequired': False}
@@ -172,13 +172,13 @@ class TestAccessPassword:
         _set_lock()
         with TestClient(app) as client:
             resp = client.post(
-                '/api/v1/access/password', json={'token': TOKEN, 'password': ''}
+                '/api/v1/access/password', json={'id': CONFIG_ID, 'password': ''}
             )
             assert resp.status_code == 401
             ok = client.post(
                 '/api/v1/access/password',
                 json={
-                    'token': TOKEN,
+                    'id': CONFIG_ID,
                     'password': '',
                     'currentPassword': 'config-pass',
                 },
@@ -189,13 +189,30 @@ class TestAccessPassword:
         with TestClient(app) as client:
             resp = client.post(
                 '/api/v1/access/password',
-                json={'token': TOKEN, 'password': 'x' * 129},
+                json={'id': CONFIG_ID, 'password': 'x' * 129},
             )
         assert resp.status_code == 422
 
-    def test_locks_are_scoped_per_token(self):
-        other = 'different-token'
+    def test_locks_are_scoped_per_config_id(self):
+        other = 'different-config-id'
         _set_lock(password='config-pass')
         with TestClient(app) as client:
             assert _status(client)['passwordRequired'] is True
             assert _status(client, other)['passwordRequired'] is False
+
+    def test_lock_survives_config_edit(self):
+        """The token changes on every save, but the id stays the same — the
+        lock is keyed by id, so the password carries over to the new URL."""
+        _set_lock(password='config-pass', config_id='same-id')
+        with TestClient(app) as client:
+            assert _status(client, 'same-id')['passwordRequired'] is True
+            client.post(
+                '/api/v1/manage/configs',
+                json={
+                    'id': 'same-id',
+                    'config': {'streamProxy': True},
+                },
+            )
+        # A different token for the same id is still locked.
+        with TestClient(app) as client:
+            assert _status(client, 'same-id')['passwordRequired'] is True

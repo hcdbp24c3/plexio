@@ -187,13 +187,25 @@ def _config_name(config: dict) -> str:
 
 class SaveConfigBody(BaseModel):
     config: dict
+    # The install id from the URL the visitor just saved; preserved across
+    # edits so /u/<id> and per-config settings stay stable.
+    id: str | None = None
+
+
+class ProxyBody(BaseModel):
+    enabled: bool
 
 
 @router.post('/configs')
 async def save_config(request: Request, body: SaveConfigBody):
-    """Record an installed addon configuration (admin sessions only)."""
-    require_admin(request)
-    config_id = get_store().save_config(body.config, _config_name(body.config))
+    """Record a saved addon configuration (any visitor, their own setup).
+
+    The list endpoint stays admin-only; posting here just lets /u/<id> and
+    /admin features know the setup exists.
+    """
+    config_id = get_store().save_config(
+        body.config, _config_name(body.config), body.id
+    )
     return {'id': config_id}
 
 
@@ -201,15 +213,28 @@ async def save_config(request: Request, body: SaveConfigBody):
 async def list_configs(request: Request):
     """Privacy-minimized list of recorded installations."""
     require_admin(request)
+    store = get_store()
     return [
         {
             'id': c['id'],
             'name': c['name'],
             'serverCount': len(c['config'].get('servers') or []),
             'createdAt': c['created_at'],
+            'proxyOverride': store.get_proxy_override(c['id']),
+            'configProxy': bool(c['config'].get('streamProxy')),
         }
-        for c in get_store().list_configs()
+        for c in store.list_configs()
     ]
+
+
+@router.put('/configs/{config_id}/proxy')
+async def set_config_proxy(request: Request, config_id: str, body: ProxyBody):
+    """Force the media relay on/off for one configuration (admin only)."""
+    require_admin(request)
+    if get_store().get_config(config_id) is None:
+        raise HTTPException(status_code=404, detail='Config not found')
+    get_store().set_proxy_override(config_id, body.enabled)
+    return {'ok': True, 'proxyOverride': body.enabled}
 
 
 @router.delete('/configs/{config_id}')
