@@ -13,6 +13,7 @@ interface Props {
 const Header: FC<Props> = ({ plexUser, setPlexToken }) => {
   const handleLogout = () => {
     setPlexToken(null);
+    window.location.href = '/';
   };
 
   return (

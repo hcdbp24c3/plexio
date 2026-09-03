@@ -10,6 +10,7 @@ import { PlexUser } from '@/types/plex.tsx';
 interface Props {
   plexToken: string | null;
   plexUser: PlexUser | null | undefined;
+  uid?: string | null;
 }
 
 const NoServersMessage: FC = () => (
@@ -23,7 +24,7 @@ const NoServersMessage: FC = () => (
   </div>
 );
 
-const ProtectedForm: FC<Props> = ({ plexToken, plexUser }) => {
+const ProtectedForm: FC<Props> = ({ plexToken, plexUser, uid = null }) => {
   const { servers, ready } = usePlexServers(plexToken);
   const initialConfig = useAddonConfigFromUrl();
   const configRoute = useConfigRoute();
@@ -40,11 +41,14 @@ const ProtectedForm: FC<Props> = ({ plexToken, plexUser }) => {
     return <NoServersMessage />;
   }
 
+  const effectiveConfigId = configRoute?.isUserRoot ? null : (configRoute?.id ?? null);
+
   return (
     <ConfigurationForm
       servers={servers}
       initialConfig={initialConfig}
-      configId={configRoute?.id}
+      configId={effectiveConfigId}
+      userUid={uid}
     />
   );
 };

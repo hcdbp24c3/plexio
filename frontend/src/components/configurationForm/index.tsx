@@ -28,6 +28,8 @@ interface Props {
   initialConfig?: ConfigurationFormType | null;
   /** The installation id from the URL, if editing a saved setup. */
   configId?: string | null;
+  /** Plex uid namespace — when present, install URL is scoped under /u/<uid> */
+  userUid?: string | null;
 }
 
 const defaultFormValues = (): ConfigurationFormType => ({
@@ -44,6 +46,7 @@ const ConfigurationForm: FC<Props> = ({
   servers,
   initialConfig,
   configId = null,
+  userUid = null,
 }) => {
   const form = useForm<ConfigurationFormType>({
     resolver: zodResolver(formSchema),
@@ -111,9 +114,11 @@ const ConfigurationForm: FC<Props> = ({
 
     const encodedConfiguration = base64_url_encode(JSON.stringify(payload));
     // Editing a saved setup keeps its id (and its password/proxy settings);
-    // a fresh setup gets a new id and lands on its own /u/<id> page.
+    // a fresh setup gets a new random id scoped under /u/<uid> when userUid exists.
     const id = configId ?? uuidv4();
-    const addonUrl = `${window.location.origin}/${id}/${encodedConfiguration}/manifest.json`;
+    const addonUrl = userUid
+      ? `${window.location.origin}/u/${userUid}/${id}/${encodedConfiguration}/manifest.json`
+      : `${window.location.origin}/${id}/${encodedConfiguration}/manifest.json`;
 
     recordConfig(payload, id);
 
@@ -123,7 +128,9 @@ const ConfigurationForm: FC<Props> = ({
     if (submitter?.name === 'clipboard') {
       void navigator.clipboard.writeText(addonUrl);
     } else {
-      window.location.href = `${window.location.origin}/u/${id}`;
+      window.location.href = userUid
+        ? `${window.location.origin}/u/${userUid}`
+        : `${window.location.origin}/u/${id}`;
     }
   }
 

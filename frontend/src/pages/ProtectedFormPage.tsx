@@ -10,6 +10,7 @@ import { Toaster } from '@/components/ui/toaster.tsx';
 import { useConfigAccess } from '@/hooks/useConfigAccess.ts';
 import { useConfigRoute } from '@/hooks/useConfigRoute.ts';
 import { useManageStatus } from '@/hooks/useManageStatus.ts';
+import { derivePlexUid } from '@/hooks/usePlexUid.ts';
 import usePlexUser from '@/hooks/usePlexUser.tsx';
 import { configAccessLogin } from '@/services/ManageService.tsx';
 
@@ -44,9 +45,21 @@ const ProtectedFormPage: FC<Props> = ({ plexToken, setPlexToken }) => {
     );
   }
 
-  const installUrl = configRoute
-    ? `${window.location.origin}/${configRoute.id}/${configRoute.token}/manifest.json`
-    : null;
+  const effectiveUid = configRoute?.uid ?? derivePlexUid(plexUser) ?? null;
+
+  const installUrl = (() => {
+    if (!configRoute) return null;
+    if (configRoute.token) {
+      if (effectiveUid) {
+        return `${window.location.origin}/u/${effectiveUid}/${configRoute.id}/${configRoute.token}/manifest.json`;
+      }
+      return `${window.location.origin}/${configRoute.id}/${configRoute.token}/manifest.json`;
+    }
+    if (configRoute.id && effectiveUid) {
+      return `${window.location.origin}/u/${effectiveUid}/manifest.json`;
+    }
+    return null;
+  })();
 
   const openInStremio = () => {
     if (installUrl) {
@@ -68,13 +81,18 @@ const ProtectedFormPage: FC<Props> = ({ plexToken, setPlexToken }) => {
         />
       ) : (
         <>
-          <ProtectedForm plexToken={plexToken} plexUser={plexUser} />
+          <ProtectedForm
+            plexToken={plexToken}
+            plexUser={plexUser}
+            uid={effectiveUid}
+          />
           {installUrl && (
             <div className="mt-4 space-y-2 rounded-lg border p-3">
               <h2 className="text-lg font-semibold">Your addon install link</h2>
               <p className="text-sm text-muted-foreground">
-                Bookmark this page (<code>/u/{configRoute?.id}</code>) to come
-                back and edit this setup. Anyone with this link can install it.
+                Bookmark this page (
+                <code>/u/{effectiveUid ?? configRoute?.id}</code>) to come back
+                and edit this setup. Anyone with this link can install it.
               </p>
               <div className="flex items-center space-x-2">
                 <Button
