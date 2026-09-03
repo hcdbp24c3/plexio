@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Loading from '@/components/loading.tsx';
 import useClientIdentifier from '@/hooks/useClientIdentifier.tsx';
 import { SetPlexToken } from '@/hooks/usePlexToken.tsx';
-import { getAuthToken } from '@/services/PlexService.tsx';
+import { derivePlexUid } from '@/hooks/usePlexUid.ts';
+import { getAuthToken, getPlexUser } from '@/services/PlexService.tsx';
 
 interface Props {
   setPlexToken: SetPlexToken;
@@ -19,16 +20,29 @@ const AuthRedirectPage: FC<Props> = ({ setPlexToken }) => {
 
     const { id, code, redirect } = Object.fromEntries(searchParams.entries());
 
-    const setAuthToken = async (): Promise<void> => {
+    const handleAuth = async (): Promise<void> => {
       const authToken = await getAuthToken(
         { id: id, code: code },
         clientIdentifier,
       );
       setPlexToken(authToken);
+
+      const target = redirect || '/';
+
+      if (target === '/' || target === '') {
+        try {
+          const user = await getPlexUser(authToken, clientIdentifier);
+          const uid = derivePlexUid(user);
+          navigate(uid ? `/u/${uid}` : target, { replace: true });
+        } catch {
+          navigate(target, { replace: true });
+        }
+      } else {
+        navigate(target, { replace: true });
+      }
     };
 
-    void setAuthToken();
-    navigate(redirect);
+    void handleAuth();
   }, [searchParams, clientIdentifier, navigate, setPlexToken]);
 
   return <Loading />;

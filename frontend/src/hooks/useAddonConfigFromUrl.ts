@@ -12,6 +12,6 @@ import { useConfigRoute } from '@/hooks/useConfigRoute.ts';
 export const useAddonConfigFromUrl = (): ConfigurationFormType | null => {
   const route = useConfigRoute();
   return useMemo(() => {
-    return route ? parseAddonUrl(route.token) : null;
+    return route?.token ? parseAddonUrl(route.token) : null;
   }, [route]);
 };
