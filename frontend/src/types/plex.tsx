@@ -4,7 +4,10 @@ export interface AuthPin {
 }
 
 export interface PlexUser {
+  id?: number | string;
+  uuid?: string;
   username: string;
+  email?: string;
   thumb: string;
 }
 

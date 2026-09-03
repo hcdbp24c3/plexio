@@ -55,20 +55,37 @@ export const getPlexUser = async (
   clientIdentifier: string,
 ): Promise<PlexUser | null> => {
   try {
-    const response = await axios.get<PlexUser>(`${PLEX_API_URL}/user`, {
-      params: {
-        'X-Plex-Product': PLEX_PRODUCT_NAME,
-        'X-Plex-Client-Identifier': clientIdentifier,
-        'X-Plex-Token': token,
+    const response = await axios.get<Record<string, unknown>>(
+      `${PLEX_API_URL}/user`,
+      {
+        params: {
+          'X-Plex-Product': PLEX_PRODUCT_NAME,
+          'X-Plex-Client-Identifier': clientIdentifier,
+          'X-Plex-Token': token,
+        },
+        headers: { Accept: 'application/json' },
       },
-      headers: { Accept: 'application/json' },
-    });
+    );
 
     if (response.status !== 200) {
       return null;
     }
 
-    return response.data;
+    const raw = response.data as unknown as Record<string, string | number | undefined> & {
+      id?: number | string;
+      uuid?: string;
+      username?: string;
+      title?: string;
+      thumb?: string;
+      email?: string;
+    };
+    return {
+      id: (raw.id ?? raw.uuid) as PlexUser['id'],
+      uuid: raw.uuid,
+      username: (raw.username || raw.title || '') as string,
+      thumb: (raw.thumb || '') as string,
+      email: raw.email,
+    };
   } catch (error) {
     console.error('Error fetching user:', error);
     return null;
