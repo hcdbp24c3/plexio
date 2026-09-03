@@ -78,6 +78,9 @@ export const parseAddonUrl = (input: string): ConfigurationFormType | null => {
   if (!token) return null;
 
   if (/^https?:\/\//i.test(token) || token.includes('/manifest.json')) {
+    // Supports both legacy /{id}/{token}/manifest.json and new /u/{uid}/{id}/{token}/manifest.json.
+    // The base64 token is always the last segment before /manifest.json; stored
+    // mode /u/<uid>/manifest.json has no token and correctly returns null below.
     const match = token.match(/\/([^/]+)\/manifest\.json$/);
     if (!match) return null;
     token = match[1];

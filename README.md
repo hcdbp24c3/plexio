@@ -101,6 +101,45 @@ Copy the token from the URL.
 You can learn more about finding your authentication token in the official Plex article 
 ["Finding an authentication token"](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/).
 
+## Per-user endpoint (`/u/<uid>`)
+
+After Plex OAuth login the frontend derives a stable `uid` from the Plex
+account (numeric `id` → `uuid` → `username`, via `derivePlexUid`) and
+redirects `/` → `/u/<uid>`. Your personal configure page lives at
+`/u/<uid>` (and `/u/<uid>/configure`). Bookmark it to edit the same setup
+later — the bookmark is scoped to your Plex user, not shared globally.
+
+Install links are built under that prefix:
+
+* **Stored mode** (single config per Plex user, bookmarked page):
+  `/u/<uid>/manifest.json` — served directly from the DB without exposing the
+  base64 token. Stremio install uses the `stremio://` variant of the same URL.
+* **Token mode** (portable, stateless):
+  `/u/<uid>/<installation_id>/<base64_cfg>/manifest.json`
+  and the same shape for catalog/meta/stream.
+  Example: `https://plexio.example.com/u/123/abc123/eyJzZXJ2.../manifest.json`
+
+`uid`, `installation_id`, and `base64_cfg` stay URL-safe (`urlsafe_b64encode`
+without padding). `uid` is treated as an opaque string throughout the
+frontend (`ConfigRoute.uid`) and as a path param on the backend.
+
+Backward compatibility is fully preserved:
+
+* `/{id}/{token}/manifest.json` (and catalog/meta/stream) keep working.
+* `/u/<id>/manifest.json` (legacy bookmark without `uid` prefix) keeps
+  working — when the DB entry is valid JSON it is served directly (200
+  `StremioManifest`), otherwise it 302-redirects to the legacy install URL.
+* `/u/<id>` and `/u/<id>/configure` keep 302-redirecting to
+  `/{id}/{token}/configure` for old bookmarks.
+
+SPA fallback: `/u/<uid>` is a client-side route. In local dev, `nginx-local.conf`
+proxies `location /` to Vite (`frontend:5173`), which has built-in history
+fallback. In production, `unit-nginx-config.json` shares
+`/app/frontend$uri` with `fallback: /app/frontend/index.html`, so any
+non-`/api` and non-`*json` `/u/<uid>` request serves `index.html` for
+`react-router` (`BrowserRouter` with `path="/u/:uid"` and `path="/u/:uid/*"`).
+No additional nginx `try_files` is needed beyond that fallback.
+
 ## Local Development
 1. Fork the Repository.
 2. Clone the Repository:
