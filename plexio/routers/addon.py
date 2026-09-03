@@ -96,12 +96,17 @@ def _streams_from_pairs(
 @router.get(
     '/{installation_id}/{base64_cfg}/manifest.json', response_model_exclude_none=True
 )
+@router.get(
+    '/u/{uid}/{installation_id}/{base64_cfg}/manifest.json',
+    response_model_exclude_none=True,
+)
 async def get_manifest(
     configuration: Annotated[
         AddonConfiguration | None,
         Depends(get_addon_configuration),
     ],
     installation_id: str | None = None,
+    uid: str | None = None,
 ) -> StremioManifest:
     catalogs = []
     description = 'Play movies and series from plex.tv.'
@@ -176,6 +181,14 @@ async def get_manifest(
     '/{installation_id}/{base64_cfg}/catalog/{stremio_type}/{catalog_id}/{extra}.json',
     response_model_exclude_none=True,
 )
+@router.get(
+    '/u/{uid}/{installation_id}/{base64_cfg}/catalog/{stremio_type}/{catalog_id}.json',
+    response_model_exclude_none=True,
+)
+@router.get(
+    '/u/{uid}/{installation_id}/{base64_cfg}/catalog/{stremio_type}/{catalog_id}/{extra}.json',
+    response_model_exclude_none=True,
+)
 async def get_catalog(
     request: Request,
     http: Annotated[ClientSession, Depends(get_http_client)],
@@ -184,6 +197,7 @@ async def get_catalog(
     catalog_id: str,
     extra: str = '',
     installation_id: str | None = None,
+    uid: str | None = None,
 ) -> StremioCatalog:
     if not configuration.include_catalogs:
         return StremioCatalog(metas=[])
@@ -228,6 +242,10 @@ async def get_catalog(
     '/{installation_id}/{base64_cfg}/meta/{stremio_type}/{plex_id:path}.json',
     response_model_exclude_none=True,
 )
+@router.get(
+    '/u/{uid}/{installation_id}/{base64_cfg}/meta/{stremio_type}/{plex_id:path}.json',
+    response_model_exclude_none=True,
+)
 async def get_meta(
     request: Request,
     http: Annotated[ClientSession, Depends(get_http_client)],
@@ -235,6 +253,7 @@ async def get_meta(
     stremio_type: StremioMediaType,
     plex_id: str,
     installation_id: str | None = None,
+    uid: str | None = None,
 ) -> StremioMetaResponse:
     if not plex_id.startswith('plexio:'):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -362,6 +381,10 @@ async def _resolve_tt_to_plex_id(
     '/{installation_id}/{base64_cfg}/stream/{stremio_type}/{media_id:path}.json',
     response_model_exclude_none=True,
 )
+@router.get(
+    '/u/{uid}/{installation_id}/{base64_cfg}/stream/{stremio_type}/{media_id:path}.json',
+    response_model_exclude_none=True,
+)
 async def get_stream(
     request: Request,
     http: Annotated[ClientSession, Depends(get_http_client)],
@@ -370,6 +393,7 @@ async def get_stream(
     stremio_type: StremioMediaType,
     media_id: str,
     installation_id: str | None = None,
+    uid: str | None = None,
 ) -> StremioStreamsResponse:
     servers = configuration.servers
     proxy_base = _proxy_base(request)
