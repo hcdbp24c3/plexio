@@ -30,7 +30,7 @@ class TestUserSetupRoutes:
             assert resp.status_code == 302
             assert (
                 resp.headers['location']
-                == f'http://testserver/setup-1/{_encoded({"streamProxy": False})}/configure'
+                == f'http://testserver/setup-1/{_encoded({"streamProxy": False})}/configure'  # noqa: E501
             )
 
     def test_u_id_manifest_redirect(self):
@@ -40,15 +40,24 @@ class TestUserSetupRoutes:
             assert resp.status_code == 302
             assert (
                 resp.headers['location']
-                == f'http://testserver/setup-1/{_encoded({"streamProxy": True})}/manifest.json'
+                == f'http://testserver/setup-1/{_encoded({"streamProxy": True})}/manifest.json'  # noqa: E501
             )
 
     def test_unknown_id_redirects_home(self):
         with TestClient(app) as client:
             assert client.get('/u/ghost', follow_redirects=False).status_code == 302
-            assert client.get('/u/ghost/configure', follow_redirects=False).status_code == 302
-            assert client.get('/u/ghost/manifest.json', follow_redirects=False).status_code == 302
-            assert client.get('/u/ghost', follow_redirects=False).headers['location'] == '/'
+            assert (
+                client.get('/u/ghost/configure', follow_redirects=False).status_code
+                == 302
+            )
+            assert (
+                client.get('/u/ghost/manifest.json', follow_redirects=False).status_code
+                == 302
+            )
+            assert (
+                client.get('/u/ghost', follow_redirects=False).headers['location']
+                == '/'
+            )
 
     def test_u_link_preserves_id_after_edit(self):
         """Re-saving with the same id keeps /u/<id> working with the new token."""

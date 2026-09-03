@@ -80,10 +80,10 @@ export const getPlexUser = async (
       email?: string;
     };
     return {
-      id: (raw.id ?? raw.uuid) as PlexUser['id'],
+      id: raw.id ?? raw.uuid,
       uuid: raw.uuid,
-      username: (raw.username || raw.title || '') as string,
-      thumb: (raw.thumb || '') as string,
+      username: raw.username ?? raw.title ?? '',
+      thumb: raw.thumb ?? '',
       email: raw.email,
     };
   } catch (error) {

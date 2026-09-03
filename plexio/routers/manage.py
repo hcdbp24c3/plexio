@@ -203,9 +203,7 @@ async def save_config(request: Request, body: SaveConfigBody):
     The list endpoint stays admin-only; posting here just lets /u/<id> and
     /admin features know the setup exists.
     """
-    config_id = get_store().save_config(
-        body.config, _config_name(body.config), body.id
-    )
+    config_id = get_store().save_config(body.config, _config_name(body.config), body.id)
     return {'id': config_id}
 
 

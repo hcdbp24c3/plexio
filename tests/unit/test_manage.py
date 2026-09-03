@@ -213,9 +213,7 @@ class TestAdminApi:
             assert anon_post.json()['id'] == 'my-setup'
 
             self._login(client)
-            created = client.post(
-                '/api/v1/manage/configs', json={'config': config}
-            )
+            created = client.post('/api/v1/manage/configs', json={'config': config})
             assert created.status_code == 200
             config_id = created.json()['id']
             assert config_id != 'my-setup'
@@ -243,9 +241,12 @@ class TestAdminApi:
 
         get_store().save_config({'streamProxy': True}, 'Setup', 'setup-1')
         with TestClient(app) as client:
-            assert client.put(
-                '/api/v1/manage/configs/setup-1/proxy', json={'enabled': False}
-            ).status_code == 401  # admin only
+            assert (
+                client.put(
+                    '/api/v1/manage/configs/setup-1/proxy', json={'enabled': False}
+                ).status_code
+                == 401
+            )  # admin only
             self._login(client)
             ok = client.put(
                 '/api/v1/manage/configs/setup-1/proxy', json={'enabled': False}
@@ -253,8 +254,7 @@ class TestAdminApi:
             assert ok.status_code == 200
             assert ok.json() == {'ok': True, 'proxyOverride': False}
             assert (
-                client.get('/api/v1/manage/configs').json()[0]['proxyOverride']
-                is False
+                client.get('/api/v1/manage/configs').json()[0]['proxyOverride'] is False
             )
             missing = client.put(
                 '/api/v1/manage/configs/nope/proxy', json={'enabled': True}
@@ -301,5 +301,3 @@ class TestProxyEnforcement:
         assert effective_stream_proxy(cfg, 'setup-2') is True
         # No override: the config's own flag decides.
         assert effective_stream_proxy(cfg, 'setup-3') is False
-
-

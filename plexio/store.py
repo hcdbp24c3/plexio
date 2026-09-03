@@ -43,9 +43,7 @@ class Store:
     def set_secret(self, value: str) -> None:
         raise NotImplementedError
 
-    def save_config(
-        self, config: dict, name: str, config_id: str | None = None
-    ) -> str:
+    def save_config(self, config: dict, name: str, config_id: str | None = None) -> str:
         raise NotImplementedError
 
     def get_config(self, config_id: str) -> dict | None:
@@ -93,9 +91,7 @@ class MemoryStore(Store):
         with self._lock:
             self._kv['server_secret'] = value
 
-    def save_config(
-        self, config: dict, name: str, config_id: str | None = None
-    ) -> str:
+    def save_config(self, config: dict, name: str, config_id: str | None = None) -> str:
         config_id = config_id or random_id()
         with self._lock:
             self._configs[config_id] = {
@@ -176,9 +172,7 @@ class SqliteStore(Store):
     def set_secret(self, value: str) -> None:
         self._set('server_secret', value)
 
-    def save_config(
-        self, config: dict, name: str, config_id: str | None = None
-    ) -> str:
+    def save_config(self, config: dict, name: str, config_id: str | None = None) -> str:
         config_id = config_id or random_id()
         with self._lock:
             self._conn.execute(
